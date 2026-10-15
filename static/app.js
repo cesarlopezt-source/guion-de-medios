@@ -38,39 +38,75 @@ function guardarFiltros() {
     try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify(filtros)); } catch (e) { /* sin almacenamiento */ }
 }
 
-function construirFila(idFila, grupo, opciones) {
-    const fila = document.getElementById(idFila);
-    fila.querySelectorAll(".chip").forEach(b => b.remove());
-    const todos = document.createElement("button");
-    todos.className = "chip todos";
-    todos.dataset.grupo = grupo;
-    todos.dataset.todos = "1";
-    todos.onclick = () => alternarTodos(grupo, opciones.map(o => o.valor));
-    fila.appendChild(todos);
-    for (const o of opciones) {
-        const b = document.createElement("button");
-        b.className = "chip";
-        b.dataset.grupo = grupo;
-        b.dataset.valor = o.valor;
-        b.textContent = o.texto;
-        b.onclick = () => alternar(grupo, o.valor);
-        fila.appendChild(b);
-    }
+const MENUS = [
+    { grupo: "paises", titulo: "Países" },
+    { grupo: "temas", titulo: "Temas" },
+    { grupo: "personajes", titulo: "Personajes" },
+];
+
+function opcionesDe(grupo) {
+    if (grupo === "paises") return meta.paises.map(p => ({ valor: p.codigo, texto: p.nombre }));
+    return meta[grupo].map(v => ({ valor: v, texto: v }));
 }
 
-function pintarChips() {
-    document.querySelectorAll(".chip").forEach(b => {
-        const marcados = filtros[b.dataset.grupo];
-        if (b.dataset.todos) {
-            const total = document.querySelectorAll(`.chip[data-grupo="${b.dataset.grupo}"]:not(.todos)`).length;
-            const on = marcados.length === total;
-            b.classList.toggle("on", on);
-            b.textContent = `${on ? "☑" : "☐"} Todos`;
-        } else {
-            const on = marcados.includes(b.dataset.valor);
-            b.classList.toggle("on", on);
-            b.textContent = `${on ? "☑" : "☐"} ${b.textContent.replace(/^[☑☐] /, "")}`;
-        }
+function construirMenus() {
+    const cont = document.getElementById("menus");
+    cont.innerHTML = MENUS.map(({ grupo, titulo }) => `
+<div class="dropdown" data-grupo="${grupo}">
+  <button class="dd-boton" onclick="abrirMenu('${grupo}', event)" aria-haspopup="true">
+    <span class="dd-titulo">${titulo}:</span> <span class="dd-resumen"></span> <span class="dd-flecha">▾</span>
+  </button>
+  <div class="dd-panel" hidden>
+    <label class="dd-opcion dd-todos"><input type="checkbox" data-todos="1"> Todos</label>
+    ${opcionesDe(grupo).map(o => `
+    <label class="dd-opcion"><input type="checkbox" value="${escapeHtml(o.valor)}"> ${escapeHtml(o.texto)}</label>`).join("")}
+  </div>
+</div>`).join("");
+    cont.querySelectorAll(".dropdown").forEach(dd => {
+        const grupo = dd.dataset.grupo;
+        dd.querySelectorAll("input").forEach(chk => {
+            chk.onchange = () => chk.dataset.todos
+                ? alternarTodos(grupo, opcionesDe(grupo).map(o => o.valor))
+                : alternar(grupo, chk.value);
+        });
+    });
+}
+
+function abrirMenu(grupo, evento) {
+    evento.stopPropagation();
+    document.querySelectorAll(".dropdown").forEach(dd => {
+        const panel = dd.querySelector(".dd-panel");
+        panel.hidden = dd.dataset.grupo === grupo ? !panel.hidden : true;
+    });
+}
+
+document.addEventListener("click", e => {
+    if (!e.target.closest(".dropdown")) document.querySelectorAll(".dd-panel").forEach(p => { p.hidden = true; });
+});
+
+function resumen(grupo) {
+    const marcados = filtros[grupo];
+    const total = opcionesDe(grupo).length;
+    if (marcados.length === total || (grupo === "personajes" && marcados.length === 0)) return "Todos";
+    if (marcados.length === 0) return "Ninguno";
+    if (marcados.length === 1) {
+        return (opcionesDe(grupo).find(o => o.valor === marcados[0]) || { texto: marcados[0] }).texto;
+    }
+    return `${marcados.length} seleccionados`;
+}
+
+function pintarMenus() {
+    document.querySelectorAll(".dropdown").forEach(dd => {
+        const grupo = dd.dataset.grupo;
+        const marcados = filtros[grupo];
+        const todos = resumen(grupo) === "Todos";
+        // En personajes, "Todos" va marcado solo y las casillas individuales eligen a quién filtrar.
+        const todosMarcado = grupo === "personajes" ? marcados.length === 0 : todos;
+        dd.querySelectorAll("input").forEach(chk => {
+            chk.checked = chk.dataset.todos ? todosMarcado : marcados.includes(chk.value);
+        });
+        dd.querySelector(".dd-resumen").textContent = resumen(grupo);
+        dd.classList.toggle("filtrando", !todos);
     });
 }
 
@@ -82,13 +118,17 @@ function alternar(grupo, valor) {
 }
 
 function alternarTodos(grupo, valores) {
-    filtros[grupo] = filtros[grupo].length === valores.length ? [] : [...valores];
+    if (grupo === "personajes") {
+        filtros.personajes = [];  // "Todos" en personajes = no filtrar por personaje
+    } else {
+        filtros[grupo] = filtros[grupo].length === valores.length ? [] : [...valores];
+    }
     filtrosCambiaron();
 }
 
 function filtrosCambiaron() {
     guardarFiltros();
-    pintarChips();
+    pintarMenus();
     cargarNoticias();
 }
 
@@ -109,15 +149,6 @@ function cambiarPeriodo() {
 async function cargarMeta() {
     const resp = await fetch("/api/meta");
     meta = await resp.json();
-    construirFila("fila-paises", "paises", meta.paises.map(p => ({ valor: p.codigo, texto: p.nombre })));
-    construirFila("fila-temas", "temas", meta.temas.map(t => ({ valor: t, texto: t })));
-    construirFila("fila-personajes", "personajes", meta.personajes.map(p => ({ valor: p, texto: p })));
-    // Descarta del estado guardado opciones que ya no existen en la configuración.
-    filtros.paises = filtros.paises.filter(p => meta.paises.some(x => x.codigo === p));
-    filtros.temas = filtros.temas.filter(t => meta.temas.includes(t));
-    filtros.personajes = filtros.personajes.filter(p => meta.personajes.includes(p));
-    pintarChips();
-    document.getElementById("select-orden").value = filtros.orden;
     construirPeriodos();
     pintarUltima();
 }
@@ -154,7 +185,7 @@ async function cargarNoticias() {
     }
     const params = new URLSearchParams({
         paises: filtros.paises.join(","), temas: filtros.temas.join(","),
-        personajes: filtros.personajes.join(","), orden: filtros.orden,
+        personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","), orden: filtros.orden,
     });
     if (periodo) { params.set("mes", periodo.mes); params.set("anio", periodo.anio); }
     cont.innerHTML = periodo ? '<p class="status-msg">Cargando y verificando enlaces…</p>' : cont.innerHTML;
@@ -393,6 +424,13 @@ document.addEventListener("keydown", e => {
 (async function iniciar() {
     try {
         await cargarMeta();
+        construirMenus();
+        // Descarta del estado guardado opciones que ya no existen en la configuración.
+        filtros.paises = filtros.paises.filter(p => meta.paises.some(x => x.codigo === p));
+        filtros.temas = filtros.temas.filter(t => meta.temas.includes(t));
+        filtros.personajes = filtros.personajes.filter(p => meta.personajes.includes(p));
+        pintarMenus();
+        document.getElementById("select-orden").value = filtros.orden;
         actualizarContador();
         await cargarNoticias();
         setInterval(async () => { await cargarMeta(); }, 60000);

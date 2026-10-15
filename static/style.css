@@ -40,16 +40,30 @@ header h1 span { font-weight: 400; opacity: 0.75; }
 
 /* Filtros */
 #controls { background: white; padding: 0.9rem 2rem; border-bottom: 1px solid #E0E0E0; }
-.fila { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-bottom: 0.6rem; }
-.fila-label { font-size: 0.78rem; font-weight: 700; color: var(--gris); text-transform: uppercase; width: 88px; }
-.chip {
-    padding: 0.3rem 0.75rem; border: 2px solid var(--borde); background: white; color: var(--oscuro);
-    border-radius: 20px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.15s;
+/* Menús desplegables con casillas */
+#menus { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.dropdown { position: relative; }
+.dd-boton {
+    display: flex; align-items: center; gap: 0.35rem; min-width: 190px;
+    padding: 0.45rem 0.8rem; border: 2px solid var(--borde); border-radius: 8px;
+    background: white; color: var(--oscuro); cursor: pointer; font-size: 0.88rem; text-align: left;
 }
-.chip:hover { border-color: var(--gris); }
-.chip.on { background: var(--oscuro); color: white; border-color: var(--oscuro); }
-.chip.todos { font-weight: 700; }
-#sort-controls { display: flex; align-items: center; gap: 1rem; font-size: 0.88rem; color: #555; flex-wrap: wrap; margin-top: 0.3rem; }
+.dd-boton:hover { border-color: var(--gris); }
+.dropdown.filtrando .dd-boton { border-color: var(--oscuro); }
+.dd-titulo { font-weight: 700; color: var(--gris); }
+.dd-resumen { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-flecha { color: var(--gris); font-size: 0.75rem; }
+.dd-panel {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 100%; width: max-content;
+    max-height: 60vh; overflow-y: auto; background: white; border: 1px solid #D5D8DC; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 0.35rem 0;
+}
+.dd-panel[hidden] { display: none; }
+.dd-opcion { display: flex; align-items: center; gap: 0.55rem; padding: 0.4rem 0.9rem; cursor: pointer; font-size: 0.88rem; }
+.dd-opcion:hover { background: var(--fondo); }
+.dd-opcion input { width: 16px; height: 16px; cursor: pointer; }
+.dd-todos { font-weight: 700; border-bottom: 1px solid #ECF0F1; margin-bottom: 0.2rem; padding-bottom: 0.5rem; }
+#sort-controls { display: flex; align-items: center; gap: 0.8rem 1rem; font-size: 0.88rem; color: #555; flex-wrap: wrap; }
 #sort-controls select {
     padding: 0.25rem 0.5rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; background: white;
 }
@@ -163,8 +177,8 @@ button:disabled { opacity: 0.5; cursor: default; }
     header { padding: 0.8rem 1rem; }
     header h1 { font-size: 1.05rem; }
     #controls { padding: 0.7rem 1rem; }
-    .fila-label { width: 100%; }
-    .chip { font-size: 0.76rem; padding: 0.25rem 0.55rem; }
+    #menus, .dropdown, .dd-boton { width: 100%; }
+    .dd-panel { width: 100%; }
     #news-container { padding: 0.8rem 1rem 190px; }
     #bottom-bar { padding: 0.6rem 1rem; }
     #selected-count { width: 100%; flex: none; }
