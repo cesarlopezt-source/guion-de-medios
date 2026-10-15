@@ -1,4 +1,37 @@
 <!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Estado de fuentes</title></head><body>
-{% for e in estado %}<p>{{ e.fuente }}</p>{% endfor %}
-</body></html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estado de fuentes · Guion de Medios</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+    <h1>🎬 Guion de Medios <span>· Estado de fuentes</span></h1>
+    <div id="header-right"><a href="/">← Volver al portal</a></div>
+</header>
+<div class="fuentes-wrap">
+    {% if not estado %}<p class="status-msg">Aún no hay corridas del watcher.</p>{% endif %}
+    {% for codigo, nombre in paises.items() %}
+        {% set filas = estado | selectattr("pais", "equalto", codigo) | list %}
+        {% if filas %}
+        <h2>{{ nombre }} · {{ filas | selectattr("ok") | list | length }}/{{ filas | length }} responden</h2>
+        <table>
+            <tr><th></th><th>Fuente</th><th>Tipo</th><th>Artículos</th><th>Última corrida (UTC)</th><th>Error</th></tr>
+            {% for e in filas %}
+            <tr>
+                <td>{{ "✅" if e.ok else "❌" }}</td>
+                <td>{{ e.fuente }}</td>
+                <td>{{ e.tipo }}</td>
+                <td>{{ e.n_articulos }}</td>
+                <td>{{ (e.ultima_corrida or "")[:16].replace("T", " ") }}</td>
+                <td class="error">{{ e.error or ("Sin artículos" if not e.ok else "") }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+    {% endfor %}
+</div>
+</body>
+</html>

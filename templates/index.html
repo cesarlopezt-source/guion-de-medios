@@ -1,2 +1,80 @@
 <!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Guion de Medios</title></head><body></body></html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guion de Medios</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+    <h1>🎬 Guion de Medios <span>· Centroamérica</span></h1>
+    <div id="header-right">
+        <span id="ultima">Cargando…</span>
+        <a href="/fuentes">Estado de fuentes</a>
+        <button id="btn-refresh" onclick="actualizar()">Actualizar ↺</button>
+    </div>
+</header>
+
+<div id="controls">
+    <div class="fila" id="fila-paises"><span class="fila-label">Países</span></div>
+    <div class="fila" id="fila-temas"><span class="fila-label">Temas</span></div>
+    <div class="fila" id="fila-personajes"><span class="fila-label">Personajes</span></div>
+    <div id="sort-controls">
+        <label>Periodo: <select id="select-periodo" onchange="cambiarPeriodo()"></select></label>
+        <label>Orden:
+            <select id="select-orden" onchange="cambiarOrden()">
+                <option value="importancia">Importancia</option>
+                <option value="recientes">Más recientes</option>
+            </select>
+        </label>
+        <span id="result-count"></span>
+        <button onclick="seleccionarVisibles()">Seleccionar todo</button>
+    </div>
+</div>
+
+<div id="news-container"><p class="status-msg">Cargando noticias…</p></div>
+
+<div id="bottom-bar">
+    <span id="selected-count">0 noticias seleccionadas</span>
+    <button class="link-btn" onclick="abrirHistorial()">Guiones anteriores</button>
+    <button id="btn-valorar" class="valorar-btn" onclick="valorarSeleccionadas()" disabled>Valorar ✦</button>
+    <button class="export-btn" onclick="exportar('word')">Word</button>
+    <button class="export-btn" onclick="exportar('excel')">Excel</button>
+    <button class="export-btn" onclick="exportar('pdf')">PDF</button>
+    <button id="btn-guion" class="guion-btn" onclick="generarGuion()" disabled>🎬 Generar Guion de medios</button>
+</div>
+
+<div id="modal-guion" class="modal" hidden>
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2>Guion de medios</h2>
+            <span id="guion-tiempo"></span>
+            <button class="cerrar" onclick="cerrarModal('modal-guion')" aria-label="Cerrar">×</button>
+        </div>
+        <textarea id="guion-texto" oninput="recalcularTiempo()"></textarea>
+        <div id="guion-estado"></div>
+        <div class="modal-acciones">
+            <button onclick="copiarGuion()">Copiar</button>
+            <button onclick="descargarGuion('word')">Descargar Word</button>
+            <button onclick="descargarGuion('pdf')">Descargar PDF</button>
+            <button class="secundario" onclick="generarGuion()">Regenerar</button>
+            <button class="secundario" onclick="cerrarModal('modal-guion')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-historial" class="modal" hidden>
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2>Guiones anteriores</h2>
+            <button class="cerrar" onclick="cerrarModal('modal-historial')" aria-label="Cerrar">×</button>
+        </div>
+        <ul id="lista-guiones"></ul>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
