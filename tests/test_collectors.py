@@ -99,3 +99,14 @@ def test_google_news_sin_medio_mapea_dominio_de_source():
     assert a[1]["fuente"] == "Diario El Mundo"
     assert "Google News" not in {x["fuente"] for x in a}  # el titular igual al nombre del medio se descarta
     assert len(a) == 4
+
+
+def test_recolectar_descarta_enlaces_que_no_son_http(monkeypatch):
+    xml = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>x</title>
+<item><title>Malo</title><link>javascript:alert(document.domain)</link></item>
+<item><title>Datos</title><link>data:text/html,hola</link></item>
+<item><title>Bueno</title><link>https://medio.sv/ok</link></item>
+</channel></rss>"""
+    monkeypatch.setattr(collectors, "descargar", lambda url: xml)
+    articulos, error = collectors.recolectar(F)
+    assert error is None and [a["url"] for a in articulos] == ["https://medio.sv/ok"]

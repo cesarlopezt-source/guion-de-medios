@@ -73,3 +73,12 @@ def test_ordenar_importancia():
 def test_ordenar_recientes():
     ns = [nt("SV", [], [], 90, "2026-10-01T00:00:00+00:00"), nt("SV", [], [], 10, "2026-10-09T00:00:00+00:00")]
     assert [n["puntaje"] for n in ordenar(ns, "recientes")] == [10, 90]
+
+
+def test_primera_fuente_es_el_articulo_mas_antiguo():
+    # La pantalla usa pais|fuentes[0].url como clave de selección: no debe cambiar si llega un título más largo.
+    a = [mk("Remesas crecen 5% en septiembre", "SV", fuente="LPG", horas=5, url="https://lpg/1"),
+         mk("Remesas crecen 5% en septiembre 2026 según BCR", "SV", fuente="EDH", horas=1, url="https://edh/2")]
+    n = construir_noticias(a)[0]
+    assert n["fuentes"][0]["url"] == "https://lpg/1"
+    assert n["titulo"].endswith("según BCR")

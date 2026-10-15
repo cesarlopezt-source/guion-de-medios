@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 import requests
 
 from collectors import google_news, rss, web
@@ -24,6 +26,8 @@ def recolectar(fuente: dict) -> tuple:
     """Devuelve (articulos, error). Nunca lanza: una fuente caída no detiene a las demás."""
     try:
         contenido = descargar(fuente["url"])
-        return _PARSERS[fuente["tipo"]](contenido, fuente), None
+        articulos = _PARSERS[fuente["tipo"]](contenido, fuente)
+        # Solo enlaces web: un feed hostil podría colar javascript: o data: en la pantalla.
+        return [a for a in articulos if urlparse(a["url"]).scheme in ("http", "https")], None
     except Exception as exc:
         return [], str(exc)[:200]

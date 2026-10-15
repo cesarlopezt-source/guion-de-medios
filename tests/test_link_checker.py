@@ -1,42 +1,49 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import requests
+
 from link_checker import check_url, check_urls
 
 
-def test_check_url_returns_true_for_200():
-    with patch("link_checker.requests.head") as mock_head:
-        mock_head.return_value = MagicMock(status_code=200)
+def resp(code):
+    return MagicMock(status_code=code)
+
+
+def test_200_activa_y_envia_user_agent():
+    with patch("link_checker.requests.head", return_value=resp(200)) as head:
         assert check_url("http://ok.com") is True
+        assert "Mozilla" in head.call_args.kwargs["headers"]["User-Agent"]
 
 
-def test_check_url_returns_false_for_404():
-    with patch("link_checker.requests.head") as mock_head:
-        mock_head.return_value = MagicMock(status_code=404)
-        assert check_url("http://missing.com") is False
+def test_404_y_410_inactiva():
+    for code in (404, 410):
+        with patch("link_checker.requests.head", return_value=resp(code)):
+            assert check_url("http://x.com") is False
 
 
-def test_check_url_returns_false_on_exception():
-    with patch("link_checker.requests.head", side_effect=requests.RequestException("timeout")):
-        assert check_url("http://timeout.com") is False
+def test_head_405_reintenta_con_get():
+    with patch("link_checker.requests.head", return_value=resp(405)), \
+         patch("link_checker.requests.get", return_value=resp(200)) as get:
+        assert check_url("http://x.com") is True
+        assert get.called
 
 
-def test_check_urls_returns_map_for_each_url():
-    with patch("link_checker.check_url", side_effect=lambda u, timeout=5.0: u == "http://ok.com"):
-        result = check_urls(["http://ok.com", "http://bad.com"])
-    assert result == {"http://ok.com": True, "http://bad.com": False}
+def test_bloqueo_403_o_429_es_desconocido():
+    with patch("link_checker.requests.head", return_value=resp(403)), \
+         patch("link_checker.requests.get", return_value=resp(403)):
+        assert check_url("http://x.com") is None
 
 
-def test_check_urls_deduplicates_input():
-    calls = []
-
-    def fake_check(u, timeout=5.0):
-        calls.append(u)
-        return True
-
-    with patch("link_checker.check_url", side_effect=fake_check):
-        check_urls(["http://x.com", "http://x.com"])
-    assert calls == ["http://x.com"]
+def test_error_de_red_inactiva():
+    with patch("link_checker.requests.head", side_effect=requests.ConnectionError("x")):
+        assert check_url("http://caida.com") is False
 
 
-def test_check_urls_empty_list_returns_empty_dict():
+def test_check_urls_deduplica():
+    with patch("link_checker.check_url", side_effect=lambda u: u.endswith("ok")) as c:
+        assert check_urls(["a/ok", "a/ok", "b/no"]) == {"a/ok": True, "b/no": False}
+        assert c.call_count == 2
+
+
+def test_check_urls_vacio():
     assert check_urls([]) == {}

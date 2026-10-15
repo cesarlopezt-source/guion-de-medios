@@ -130,3 +130,19 @@ def test_export_noticias(client):
 def test_valorar_sin_clave_503(client, monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert client.post("/api/valorar", json={"items": [N1]}).status_code == 503
+
+
+def test_meta_incluye_mes_actual_en_hora_sv(client):
+    from ajustes import ZONA_SV
+    hoy = datetime.now(ZONA_SV)
+    assert client.get("/api/meta").get_json()["mes_actual"] == [hoy.year, hoy.month]
+
+
+def test_mes_pasado_lee_cache_sin_red(client, monkeypatch):
+    import link_checker
+    monkeypatch.setattr(link_checker, "check_urls", lambda urls: (_ for _ in ()).throw(AssertionError("sin red")))
+    store.reemplazar_noticias(9, 2026, [noticia("viejo", "SV", ["Economía"]), noticia("viejo2", "SV", ["Economía"])])
+    store.guardar_estado_enlaces({"https://m/viejo": False})
+    r = {n["titulo"]: n for n in client.get("/api/news?paises=SV&temas=Economía&mes=9&anio=2026").get_json()}
+    assert r["viejo"]["fuentes"][0]["activa"] is False
+    assert "activa" not in r["viejo2"]["fuentes"][0]

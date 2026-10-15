@@ -14,10 +14,13 @@ let noticias = [];                 // lo que devolvió /api/news con los filtros
 const seleccion = new Map();       // "pais|titulo" → noticia completa (sobrevive filtros y recargas)
 const valoraciones = new Map();    // "pais|titulo" → texto
 let filtros = cargarFiltros();
-let periodo = null;                // {mes, anio}; null = mes actual
+let periodo = null;                // {mes, anio}; null = sigue el mes actual de El Salvador (meta.mes_actual)
 let ultimaPeticion = 0;            // solo se pinta la respuesta de la consulta más reciente
 
-const clave = n => `${n.pais}|${n.titulo}`;
+// Clave estable entre recálculos: el enlace del artículo más antiguo del grupo (fuentes[0]) no cambia
+// aunque llegue una nota con un título más largo.
+const clave = n => `${n.pais}|${n.fuentes[0] ? n.fuentes[0].url : n.titulo}`;
+const urlSegura = u => /^https?:\/\//i.test(u || "") ? u : "#";
 
 function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, c =>
@@ -139,8 +142,8 @@ function cambiarOrden() {
 
 function cambiarPeriodo() {
     const [anio, mes] = document.getElementById("select-periodo").value.split("-").map(Number);
-    const hoy = new Date();
-    periodo = (anio === hoy.getFullYear() && mes === hoy.getMonth() + 1) ? null : { anio, mes };
+    const [anioActual, mesActual] = meta.mes_actual;
+    periodo = (anio === anioActual && mes === mesActual) ? null : { anio, mes };
     cargarNoticias();
 }
 
@@ -154,8 +157,7 @@ async function cargarMeta() {
 }
 
 function construirPeriodos() {
-    const hoy = new Date();
-    const actual = [hoy.getFullYear(), hoy.getMonth() + 1];
+    const actual = meta.mes_actual;  // en hora de El Salvador, no la del navegador
     const meses = meta.meses.some(([a, m]) => a === actual[0] && m === actual[1]) ? meta.meses : [actual, ...meta.meses];
     const sel = document.getElementById("select-periodo");
     const elegido = periodo ? `${periodo.anio}-${periodo.mes}` : `${actual[0]}-${actual[1]}`;
@@ -187,8 +189,9 @@ async function cargarNoticias() {
         paises: filtros.paises.join(","), temas: filtros.temas.join(","),
         personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","), orden: filtros.orden,
     });
-    if (periodo) { params.set("mes", periodo.mes); params.set("anio", periodo.anio); }
-    cont.innerHTML = periodo ? '<p class="status-msg">Cargando y verificando enlaces…</p>' : cont.innerHTML;
+    const [anio, mes] = periodo ? [periodo.anio, periodo.mes] : meta.mes_actual;
+    params.set("mes", mes);
+    params.set("anio", anio);
     try {
         const resp = await fetch(`/api/news?${params}`);
         if (!resp.ok) throw new Error(`Error del servidor: ${resp.status}`);
@@ -223,7 +226,7 @@ function pintarNoticias() {
             const estado = f.activa === undefined ? "" : f.activa
                 ? ' <span class="link-status active">● activa</span>'
                 : ' <span class="link-status inactive">● no disponible</span>';
-            return `<a href="${escapeHtml(f.url)}" target="_blank" rel="noopener">${escapeHtml(f.nombre)}</a>${estado}`;
+            return `<a href="${escapeHtml(urlSegura(f.url))}" target="_blank" rel="noopener">${escapeHtml(f.nombre)}</a>${estado}`;
         }).join("");
         const fecha = new Date(n.publicado).toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short" });
         return `

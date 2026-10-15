@@ -1,13 +1,12 @@
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 
 from flask import Flask, Response, jsonify, render_template, request
 
 import ajustes
 import exporter
 import guionista
-import link_checker
 import store
 import valorador
 import watcher
@@ -71,12 +70,17 @@ def api_meta():
         "ultima_actualizacion": ultima["fin"] if ultima else None,
         "meses": [list(m) for m in store.meses_disponibles()],
         "en_curso": watcher.esta_bloqueado(ajustes.LOCK_PATH),
+        "mes_actual": [_hoy_sv().year, _hoy_sv().month],
     })
+
+
+def _hoy_sv() -> datetime:
+    return datetime.now(ajustes.ZONA_SV)
 
 
 @app.route("/api/news")
 def api_news():
-    ahora = datetime.now(timezone.utc)
+    ahora = _hoy_sv()
     try:
         mes = int(request.args.get("mes") or ahora.month)
         anio = int(request.args.get("anio") or ahora.year)
@@ -89,10 +93,12 @@ def api_news():
     noticias = ordenar(noticias, request.args.get("orden", "importancia"))
 
     if (mes, anio) != (ahora.month, ahora.year):
-        activos = link_checker.check_urls([f["url"] for n in noticias for f in n["fuentes"]])
+        # El watcher verifica los enlaces archivados por tandas; aquí solo se lee lo ya verificado.
+        estados = store.obtener_estado_enlaces([f["url"] for n in noticias for f in n["fuentes"]])
         for n in noticias:
             for f in n["fuentes"]:
-                f["activa"] = activos.get(f["url"], False)
+                if f["url"] in estados:
+                    f["activa"] = estados[f["url"]]
     return jsonify(noticias)
 
 

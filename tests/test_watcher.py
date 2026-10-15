@@ -108,3 +108,49 @@ def test_log_sin_consola_no_agrega_stream(monkeypatch, tmp_path):
             if h not in antes:
                 raiz.removeHandler(h)
                 h.close()
+
+
+def test_mes_actual_en_hora_de_el_salvador(monkeypatch, rutas):
+    # 1 nov 03:00 UTC = 31 oct en El Salvador: se reconstruye octubre
+    ahora = datetime(2026, 11, 1, 3, tzinfo=timezone.utc)
+    articulo = {**art("u1"), "publicado": ahora}
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([articulo], None))
+    watcher.correr([F1], ahora=ahora, **rutas)
+    assert len(store.obtener_noticias(10, 2026, rutas["db_path"])) == 1
+
+
+def test_primeros_dias_del_mes_reconstruye_tambien_el_anterior(monkeypatch, rutas):
+    # Una nota del 31 oct (hora SV) recolectada el 1 nov a mediodía debe aparecer en octubre.
+    ahora = datetime(2026, 11, 1, 18, tzinfo=timezone.utc)
+    tarde = {**art("u1"), "publicado": datetime(2026, 11, 1, 4, tzinfo=timezone.utc)}  # 31 oct 22:00 SV
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([tarde], None))
+    watcher.correr([F1], ahora=ahora, **rutas)
+    assert len(store.obtener_noticias(10, 2026, rutas["db_path"])) == 1
+
+
+def test_reclasifica_articulos_guardados_al_reconstruir(monkeypatch, rutas):
+    store.init_db(rutas["db_path"])
+    viejo = {**art("u1", "Aguirre presenta propuesta"), "temas": ["Otras"], "personajes": [], "menciona_sv": False}
+    store.guardar_articulos([viejo], rutas["db_path"])
+    import config.personajes
+    import classifier
+    monkeypatch.setitem(config.personajes.PERSONAJES, "Aguirre", ["aguirre"])
+    monkeypatch.setattr(classifier, "_PERSONAJES", {**classifier._PERSONAJES, "Aguirre": classifier._patron(["aguirre"])})
+    import noticias
+    monkeypatch.setattr(noticias, "_ORDEN_PERSONAJES", list(noticias._ORDEN_PERSONAJES) + ["Aguirre"])
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([], None))
+    watcher.correr([F1], ahora=AHORA, **rutas)
+    assert store.obtener_noticias(10, 2026, rutas["db_path"])[0]["personajes"] == ["Aguirre"]
+
+
+def test_verifica_enlaces_de_meses_anteriores(monkeypatch, rutas):
+    import link_checker
+    store.init_db(rutas["db_path"])
+    viejo = {"titulo": "v", "resumen": "", "pais": "SV", "temas": ["Economía"], "personajes": [], "menciona_sv": False,
+             "fuentes": [{"nombre": "A", "url": "https://a/viejo"}], "publicado": "2026-09-01T00:00:00+00:00",
+             "n_fuentes": 1, "puntaje": 1.0, "estrellas": 1}
+    store.reemplazar_noticias(9, 2026, [viejo], rutas["db_path"])
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([], None))
+    monkeypatch.setattr(link_checker, "check_urls", lambda urls: {u: False for u in urls})
+    watcher.correr([F1], ahora=AHORA, **rutas)
+    assert store.obtener_estado_enlaces(["https://a/viejo"], rutas["db_path"]) == {"https://a/viejo": False}

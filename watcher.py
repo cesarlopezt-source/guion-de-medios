@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import ajustes
+import link_checker
 import store
 from classifier import clasificar
 from collectors import recolectar
@@ -18,6 +19,7 @@ from noticias import construir_noticias
 log = logging.getLogger("watcher")
 
 MAX_PARALELO = 8
+ENLACES_POR_CORRIDA = 300  # verificación de noticias archivadas, por tandas
 PRIORIDAD_VIA = {"rss": 0, "web": 1, "google_news": 2}
 
 
@@ -50,6 +52,15 @@ def liberar_bloqueo(lock_path: Path) -> None:
     lock_path.unlink(missing_ok=True)
 
 
+def meses_a_reconstruir(ahora: datetime) -> list:
+    """Mes actual en hora de El Salvador; los 2 primeros días también el anterior (notas que llegan tarde)."""
+    local = ahora.astimezone(ajustes.ZONA_SV)
+    meses = [(local.month, local.year)]
+    if local.day <= 2:
+        meses.append((12, local.year - 1) if local.month == 1 else (local.month - 1, local.year))
+    return meses
+
+
 def fuentes_por_defecto() -> list:
     return [f for f in FUENTES if f["activa"]] + consultas_google_news()
 
@@ -80,8 +91,13 @@ def correr(fuentes: list = None, db_path: Path = None, lock_path: Path = None, a
         articulos.sort(key=lambda a: PRIORIDAD_VIA[a["via"]])
         nuevos = store.guardar_articulos([clasificar(a) for a in articulos], db_path)
 
-        del_mes = store.obtener_articulos(ahora.month, ahora.year, db_path)
-        store.reemplazar_noticias(ahora.month, ahora.year, construir_noticias(del_mes), db_path)
+        for mes, anio in meses_a_reconstruir(ahora):
+            # Se reclasifica para que los cambios en config/ (temas, personajes) apliquen a todo el mes.
+            del_mes = [clasificar(a) for a in store.obtener_articulos(mes, anio, db_path)]
+            store.reemplazar_noticias(mes, anio, construir_noticias(del_mes), db_path)
+
+        pendientes = store.urls_por_verificar(meses_a_reconstruir(ahora)[0], ENLACES_POR_CORRIDA, db_path)
+        store.guardar_estado_enlaces(link_checker.check_urls(pendientes), db_path)
         store.finalizar_corrida(corrida, nuevos, True, db_path)
         log.info("Corrida OK: %d nuevos, %d fuentes OK, %d con error", nuevos, fuentes_ok, fuentes_error)
         return {"ok": True, "nuevos": nuevos, "fuentes_ok": fuentes_ok, "fuentes_error": fuentes_error}

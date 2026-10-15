@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import ajustes
@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS corridas (
     fin TEXT,
     n_articulos_nuevos INTEGER,
     ok INTEGER
+);
+CREATE TABLE IF NOT EXISTS enlaces (
+    url TEXT PRIMARY KEY,
+    activa INTEGER,            -- NULL = el sitio bloquea la verificación
+    verificado TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS guiones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,7 +114,7 @@ def obtener_articulos(mes: int, anio: int, db_path: Path = None) -> list:
     conn = _conectar(db_path)
     filas = conn.execute(
         "SELECT titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via "
-        "FROM articulos WHERE strftime('%Y-%m', publicado) = ?",
+        "FROM articulos WHERE strftime('%Y-%m', publicado, '-6 hours') = ?",  # mes en hora de El Salvador
         (f"{anio:04d}-{mes:02d}",),
     ).fetchall()
     conn.close()
@@ -227,6 +232,54 @@ def ultima_corrida(db_path: Path = None):
     ).fetchone()
     conn.close()
     return dict(fila) if fila else None
+
+
+def guardar_estado_enlaces(estados: dict, db_path: Path = None) -> None:
+    """estados: url → True / False / None (desconocido)."""
+    conn = _conectar(db_path)
+    ahora = _ahora()
+    with conn:
+        conn.executemany(
+            "INSERT INTO enlaces (url, activa, verificado) VALUES (?, ?, ?) "
+            "ON CONFLICT(url) DO UPDATE SET activa=excluded.activa, verificado=excluded.verificado",
+            [(u, None if v is None else int(v), ahora) for u, v in estados.items()],
+        )
+    conn.close()
+
+
+def obtener_estado_enlaces(urls: list, db_path: Path = None) -> dict:
+    """url → bool, solo para los enlaces ya verificados con resultado conocido."""
+    if not urls:
+        return {}
+    conn = _conectar(db_path)
+    resultado = {}
+    unicas = list(dict.fromkeys(urls))
+    for i in range(0, len(unicas), 500):
+        lote = unicas[i:i + 500]
+        filas = conn.execute(
+            f"SELECT url, activa FROM enlaces WHERE activa IS NOT NULL AND url IN ({','.join('?' * len(lote))})",
+            lote,
+        ).fetchall()
+        resultado.update({f["url"]: bool(f["activa"]) for f in filas})
+    conn.close()
+    return resultado
+
+
+def urls_por_verificar(mes_actual: tuple, limite: int, db_path: Path = None, dias: int = 7) -> list:
+    """Enlaces de meses anteriores sin verificar o verificados hace más de `dias`; sin redirecciones de Google News."""
+    mes, anio = mes_actual
+    limite_fecha = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
+    conn = _conectar(db_path)
+    filas = conn.execute(
+        "SELECT u.url FROM (SELECT DISTINCT json_extract(j.value, '$.url') AS url, n.anio, n.mes "
+        "FROM noticias n, json_each(n.fuentes) j WHERE NOT (n.mes = ? AND n.anio = ?)) u "
+        "LEFT JOIN enlaces e ON e.url = u.url "
+        "WHERE u.url NOT LIKE 'https://news.google.com/%' AND (e.url IS NULL OR e.verificado < ?) "
+        "GROUP BY u.url ORDER BY MAX(u.anio) DESC, MAX(u.mes) DESC LIMIT ?",
+        (mes, anio, limite_fecha, limite),
+    ).fetchall()
+    conn.close()
+    return [f["url"] for f in filas]
 
 
 def guardar_guion(noticias: list, texto: str, palabras: int, minutos: float, db_path: Path = None) -> int:

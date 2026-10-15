@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,5 +14,7 @@ LOCK_PATH = DATA_DIR / "watcher.lock"
 PORT = int(os.environ.get("PORT") or 5050)
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
 GEMINI_MODEL_VALORAR = os.environ.get("GEMINI_MODEL_VALORAR") or "gemini-2.5-flash-lite"
+# Los meses se cuentan en hora de El Salvador (UTC-6, sin horario de verano).
+ZONA_SV = timezone(timedelta(hours=-6), "America/El_Salvador")
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)

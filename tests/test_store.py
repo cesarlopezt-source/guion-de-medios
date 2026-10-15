@@ -79,3 +79,29 @@ def test_guion_roundtrip(db_path):
     g = store.obtener_guion(gid, db_path)
     assert g["texto"] == "texto" and g["noticias"][0]["titulo"] == "A"
     assert store.obtener_guion(999, db_path) is None
+
+
+def test_mes_se_define_en_hora_de_el_salvador(db_path):
+    store.init_db(db_path)
+    # 1 nov 03:00 UTC = 31 oct 21:00 en El Salvador (UTC-6)
+    store.guardar_articulos([a("u1", publicado=datetime(2026, 11, 1, 3, tzinfo=timezone.utc))], db_path)
+    assert len(store.obtener_articulos(10, 2026, db_path)) == 1
+    assert store.obtener_articulos(11, 2026, db_path) == []
+
+
+def test_estado_enlaces_cache(db_path):
+    store.init_db(db_path)
+    store.guardar_estado_enlaces({"https://a": True, "https://b": False, "https://c": None}, db_path)
+    assert store.obtener_estado_enlaces(["https://a", "https://b", "https://c", "https://z"], db_path) == \
+        {"https://a": True, "https://b": False}
+
+
+def test_urls_por_verificar_excluye_mes_actual_google_y_recientes(db_path):
+    store.init_db(db_path)
+    fuentes = [{"nombre": "A", "url": "https://a/1"}, {"nombre": "G", "url": "https://news.google.com/rss/articles/x"}]
+    store.reemplazar_noticias(9, 2026, [n("sep", fuentes=fuentes), n("sep2", fuentes=[{"nombre": "B", "url": "https://b/2"}])], db_path)
+    store.reemplazar_noticias(10, 2026, [n("oct", fuentes=[{"nombre": "C", "url": "https://c/3"}])], db_path)
+    assert sorted(store.urls_por_verificar((10, 2026), 50, db_path)) == ["https://a/1", "https://b/2"]
+    store.guardar_estado_enlaces({"https://a/1": True}, db_path)
+    assert store.urls_por_verificar((10, 2026), 50, db_path) == ["https://b/2"]
+    assert len(store.urls_por_verificar((10, 2026), 1, db_path)) == 1
