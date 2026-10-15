@@ -89,3 +89,22 @@ def test_fuentes_por_defecto_activas_mas_google_news(monkeypatch):
     fs = watcher.fuentes_por_defecto()
     assert all(f["activa"] for f in fs)
     assert any(f["tipo"] == "google_news" for f in fs) and any(f["tipo"] == "rss" for f in fs)
+
+
+def test_log_sin_consola_no_agrega_stream(monkeypatch, tmp_path):
+    import logging
+    import sys
+    import ajustes
+    monkeypatch.setattr(ajustes, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(sys, "stderr", None)
+    raiz = logging.getLogger()
+    antes = list(raiz.handlers)
+    try:
+        watcher._configurar_log()
+        nuevos = [h for h in raiz.handlers if h not in antes]
+        assert nuevos and all(type(h).__name__ == "RotatingFileHandler" for h in nuevos)
+    finally:
+        for h in raiz.handlers[:]:
+            if h not in antes:
+                raiz.removeHandler(h)
+                h.close()

@@ -1,6 +1,7 @@
 """Recolecta, clasifica, agrupa y guarda las noticias. Lo corre la tarea programada cada hora."""
 import logging
 import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -91,8 +92,14 @@ def correr(fuentes: list = None, db_path: Path = None, lock_path: Path = None, a
 def _configurar_log() -> None:
     handler = RotatingFileHandler(ajustes.LOG_DIR / "watcher.log", maxBytes=1_000_000, backupCount=5,
                                   encoding="utf-8")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[handler, logging.StreamHandler()])
+    handlers = [handler]
+    if sys.stderr is not None:  # con pythonw.exe (tarea programada) no hay consola
+        handlers.append(logging.StreamHandler())
+    raiz = logging.getLogger()
+    raiz.setLevel(logging.INFO)
+    for h in handlers:
+        h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        raiz.addHandler(h)
 
 
 if __name__ == "__main__":
