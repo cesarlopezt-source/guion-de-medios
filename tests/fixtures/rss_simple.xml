@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Medio X</title>
+<item><title>Remesas crecen en septiembre</title><link>https://medio.sv/remesas</link>
+<description><![CDATA[<p>Texto&nbsp;<img src="a.jpg"></p>]]></description>
+<pubDate>Tue, 14 Oct 2026 10:00:00 -0600</pubDate></item>
+<item><title>Nota sin fecha</title><link>https://medio.sv/sin-fecha</link><description>Sin fecha</description></item>
+<item><title>Nota del futuro</title><link>https://medio.sv/futuro</link><description>Futuro</description>
+<pubDate>Mon, 01 Jan 2030 10:00:00 GMT</pubDate></item>
+</channel></rss>
