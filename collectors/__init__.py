@@ -1,6 +1,6 @@
 import requests
 
-from collectors import google_news, rss
+from collectors import google_news, rss, web
 
 HEADERS = {
     "User-Agent": (
@@ -11,7 +11,7 @@ HEADERS = {
 }
 TIMEOUT = 15
 
-_PARSERS = {"rss": rss.parsear, "google_news": google_news.parsear}
+_PARSERS = {"rss": rss.parsear, "google_news": google_news.parsear, "web": web.parsear}
 
 
 def descargar(url: str) -> bytes:
