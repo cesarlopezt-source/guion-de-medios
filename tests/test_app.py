@@ -158,3 +158,12 @@ def test_mes_pasado_lee_cache_sin_red(client, monkeypatch):
 def test_modo_pc_no_pide_login(client):
     assert client.get("/").status_code == 200
     assert client.get("/api/meta").status_code == 200
+
+
+def test_guion_con_gemini_saturado_responde_503(client, monkeypatch):
+    import guionista, ia
+    def saturado(*a, **k):
+        raise ia.IASaturada("Gemini está saturado en este momento.")
+    monkeypatch.setattr(guionista, "generar_guion", saturado)
+    r = client.post("/api/guion", json={"noticias": [{"titulo": "x"}]})
+    assert r.status_code == 503 and "saturado" in r.get_json()["error"]

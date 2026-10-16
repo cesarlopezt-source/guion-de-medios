@@ -31,6 +31,9 @@ DATABASE_URL = limpiar_dsn(os.environ.get("DATABASE_URL"))  # Supabase
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or None
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
 GEMINI_MODEL_VALORAR = os.environ.get("GEMINI_MODEL_VALORAR") or "gemini-2.5-flash-lite"
+# Si el modelo está saturado (503) se prueban estos, en orden.
+GEMINI_RESPALDOS = [m.strip() for m in (os.environ.get("GEMINI_MODELOS_RESPALDO")
+                    or "gemini-2.5-flash-lite,gemini-flash-latest").split(",") if m.strip()]
 # Los meses se cuentan en hora de El Salvador (UTC-6, sin horario de verano).
 ZONA_SV = timezone(timedelta(hours=-6), "America/El_Salvador")
 

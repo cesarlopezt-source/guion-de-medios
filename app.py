@@ -19,7 +19,7 @@ from config.paises import PAISES
 from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 from config.temas import TEMAS
-from ia import ConfigError
+from ia import ConfigError, IASaturada
 from noticias import filtrar, ordenar
 
 app = Flask(__name__)
@@ -59,10 +59,10 @@ def _archivo(contenido: bytes, formato: str, base: str) -> Response:
 
 
 def _manejar_ia(funcion):
-    """Errores de IA → 400 (entrada), 503 (sin clave) o 500 (otro)."""
+    """Errores de IA → 400 (entrada), 503 (sin clave o Gemini saturado) o 500 (otro)."""
     try:
         return funcion()
-    except ConfigError as e:
+    except (ConfigError, IASaturada) as e:
         return jsonify({"error": str(e)}), 503
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
