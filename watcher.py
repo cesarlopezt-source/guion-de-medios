@@ -65,73 +65,44 @@ def fuentes_por_defecto() -> list:
     return [f for f in FUENTES if f["activa"]] + consultas_google_news()
 
 
-def correr(fuentes: list = None, db_path: Path = None, lock_path: Path = None, ahora: datetime = None,
-           origen: str = "pc", verificar_enlaces: bool = True, sincronizar=None) -> dict:
-    """Una corrida completa. En la PC (origen="pc") usa además el archivo de bloqueo; en la nube solo el de la base.
-
-    `sincronizar` (opcional, ver sincronizacion.py) recibe antes(), despues(meses) y al_final(ok).
-    """
-    usa_archivo = origen == "pc"
+def correr(fuentes: list = None, db_path: Path = None, lock_path: Path = None, ahora: datetime = None) -> dict:
     lock_path = lock_path or ajustes.LOCK_PATH
-    if usa_archivo and not adquirir_bloqueo(lock_path):
+    if not adquirir_bloqueo(lock_path):
         log.info("Ya hay una corrida en curso; se cancela esta.")
         return {"ok": False, "motivo": "en_curso"}
     try:
+        fuentes = fuentes if fuentes is not None else fuentes_por_defecto()
+        ahora = ahora or datetime.now(timezone.utc)
         store.init_db(db_path)
-        if sincronizar is not None and not sincronizar.antes():
-            log.info("La nube está buscando noticias; se cancela esta corrida.")
-            return {"ok": False, "motivo": "en_curso"}
-        corrida = store.intentar_iniciar_corrida(origen, db_path)
-        if corrida is None:
-            if sincronizar is not None:
-                sincronizar.al_final(False)
-            log.info("Ya hay una corrida abierta en la base; se cancela esta.")
-            return {"ok": False, "motivo": "en_curso"}
-        nuevos, ok = 0, False
-        try:
-            resultado = _recolectar_y_guardar(fuentes, db_path, ahora or datetime.now(timezone.utc), origen,
-                                              verificar_enlaces, sincronizar)
-            nuevos, ok = resultado["nuevos"], True
-            return resultado
-        finally:
-            store.finalizar_corrida(corrida, nuevos, ok, db_path)
-            if sincronizar is not None:
-                sincronizar.al_final(ok)
-    finally:
-        if usa_archivo:
-            liberar_bloqueo(lock_path)
+        corrida = store.iniciar_corrida(db_path)
 
+        with ThreadPoolExecutor(max_workers=MAX_PARALELO) as ex:
+            resultados = list(ex.map(recolectar, fuentes))
 
-def _recolectar_y_guardar(fuentes, db_path, ahora, origen, verificar_enlaces, sincronizar) -> dict:
-    fuentes = fuentes if fuentes is not None else fuentes_por_defecto()
-    with ThreadPoolExecutor(max_workers=MAX_PARALELO) as ex:
-        resultados = list(ex.map(recolectar, fuentes))
+        articulos, fuentes_ok, fuentes_error = [], 0, 0
+        for fuente, (encontrados, error) in zip(fuentes, resultados):
+            ok = error is None and bool(encontrados)
+            fuentes_ok += ok
+            fuentes_error += not ok
+            store.registrar_estado_fuente(fuente, ok, len(encontrados), error, db_path)
+            articulos.extend(encontrados)
 
-    articulos, fuentes_ok, fuentes_error = [], 0, 0
-    for fuente, (encontrados, error) in zip(fuentes, resultados):
-        ok = error is None and bool(encontrados)
-        fuentes_ok += ok
-        fuentes_error += not ok
-        store.registrar_estado_fuente(fuente, ok, len(encontrados), error, db_path)
-        articulos.extend(encontrados)
+        # INSERT OR IGNORE conserva el primero: así gana la versión del RSS directo.
+        articulos.sort(key=lambda a: PRIORIDAD_VIA[a["via"]])
+        nuevos = store.guardar_articulos([clasificar(a) for a in articulos], db_path)
 
-    # INSERT OR IGNORE conserva el primero: así gana la versión del RSS directo.
-    articulos.sort(key=lambda a: PRIORIDAD_VIA[a["via"]])
-    nuevos = store.guardar_articulos([clasificar(a) for a in articulos], db_path, origen=origen)
+        for mes, anio in meses_a_reconstruir(ahora):
+            # Se reclasifica para que los cambios en config/ (temas, personajes) apliquen a todo el mes.
+            del_mes = [clasificar(a) for a in store.obtener_articulos(mes, anio, db_path)]
+            store.reemplazar_noticias(mes, anio, construir_noticias(del_mes), db_path)
 
-    meses = meses_a_reconstruir(ahora)
-    for mes, anio in meses:
-        # Se reclasifica para que los cambios en config/ (temas, personajes) apliquen a todo el mes.
-        del_mes = [clasificar(a) for a in store.obtener_articulos(mes, anio, db_path)]
-        store.reemplazar_noticias(mes, anio, construir_noticias(del_mes), db_path)
-
-    if verificar_enlaces:
-        pendientes = store.urls_por_verificar(meses[0], ENLACES_POR_CORRIDA, db_path)
+        pendientes = store.urls_por_verificar(meses_a_reconstruir(ahora)[0], ENLACES_POR_CORRIDA, db_path)
         store.guardar_estado_enlaces(link_checker.check_urls(pendientes), db_path)
-    if sincronizar is not None:
-        sincronizar.despues(meses)
-    log.info("Corrida OK (%s): %d nuevos, %d fuentes OK, %d con error", origen, nuevos, fuentes_ok, fuentes_error)
-    return {"ok": True, "nuevos": nuevos, "fuentes_ok": fuentes_ok, "fuentes_error": fuentes_error}
+        store.finalizar_corrida(corrida, nuevos, True, db_path)
+        log.info("Corrida OK: %d nuevos, %d fuentes OK, %d con error", nuevos, fuentes_ok, fuentes_error)
+        return {"ok": True, "nuevos": nuevos, "fuentes_ok": fuentes_ok, "fuentes_error": fuentes_error}
+    finally:
+        liberar_bloqueo(lock_path)
 
 
 def _configurar_log() -> None:
@@ -147,18 +118,10 @@ def _configurar_log() -> None:
         raiz.addHandler(h)
 
 
-def _sincronizacion_por_defecto():
-    """En la PC, si .env tiene DATABASE_URL, cada corrida se sincroniza con la nube."""
-    if ajustes.MODO != "pc" or not ajustes.DATABASE_URL:
-        return None
-    from sincronizacion import Sincronizacion
-    return Sincronizacion()
-
-
 if __name__ == "__main__":
     _configurar_log()
     try:
-        print(correr(sincronizar=_sincronizacion_por_defecto()))
+        print(correr())
     except Exception:
         log.exception("La corrida falló")
         raise

@@ -29,20 +29,6 @@ Abrir: acceso directo **Guion de Medios** en el escritorio, o <http://127.0.0.1:
 
 Después de cambiar la configuración, reinicia el portal: `Stop-ScheduledTask GuionMedios-Portal; Start-ScheduledTask GuionMedios-Portal`.
 
-## En línea (desde cualquier equipo)
-
-La misma aplicación corre también en **Render** (`MODO=nube`, con contraseña) sobre una base **Neon** (Postgres):
-
-- **PC encendida:** cada corrida del watcher baja de Neon lo que la página encontró en vivo, recolecta y sube artículos, noticias, estado de fuentes, enlaces y guiones. Para activarlo basta con poner `DATABASE_URL` en el `.env` de la PC.
-- **PC apagada:** si los datos en Neon tienen más de 2 horas, la página de Render busca en vivo (1 a 3 min) y guarda lo encontrado en Neon. El botón Actualizar hace lo mismo.
-- Neon guarda las noticias agrupadas para siempre y los artículos sueltos solo del mes actual y el anterior. La PC conserva todo.
-- Render gratis se duerme a los 15 min sin uso; no hay ningún cron que lo despierte, así que las horas gratis alcanzan de sobra.
-- El estado de la sincronización aparece en **Estado de fuentes** como "Sincronización con la nube".
-
-Publicación: `render.yaml` (Blueprint). En Render se cargan `DATABASE_URL`, `APP_PASSWORD` y `GEMINI_API_KEY`; `FLASK_SECRET_KEY` la genera Render.
-
-Pruebas del motor Postgres: usan `TEST_DATABASE_URL` si está en `.env`; si no, levantan un Postgres local (`pip install -r requirements-dev.txt`).
-
 ## Instalación (una vez)
 
 ```powershell
