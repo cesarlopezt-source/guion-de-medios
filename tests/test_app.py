@@ -146,3 +146,8 @@ def test_mes_pasado_lee_cache_sin_red(client, monkeypatch):
     r = {n["titulo"]: n for n in client.get("/api/news?paises=SV&temas=Economía&mes=9&anio=2026").get_json()}
     assert r["viejo"]["fuentes"][0]["activa"] is False
     assert "activa" not in r["viejo2"]["fuentes"][0]
+
+
+def test_modo_pc_no_pide_login(client):
+    assert client.get("/").status_code == 200
+    assert client.get("/api/meta").status_code == 200

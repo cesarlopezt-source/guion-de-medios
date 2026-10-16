@@ -19,6 +19,16 @@ let ultimaPeticion = 0;            // solo se pinta la respuesta de la consulta 
 
 // Clave estable entre recálculos: el enlace del artículo más antiguo del grupo (fuentes[0]) no cambia
 // aunque llegue una nota con un título más largo.
+// En internet la sesión puede vencer: cualquier 401 lleva a la pantalla de contraseña.
+async function api(url, opciones) {
+    const resp = await fetch(url, opciones);
+    if (resp.status === 401) {
+        location.href = "/login";
+        throw new Error("Sesión expirada");
+    }
+    return resp;
+}
+
 const clave = n => `${n.pais}|${n.fuentes[0] ? n.fuentes[0].url : n.titulo}`;
 const urlSegura = u => /^https?:\/\//i.test(u || "") ? u : "#";
 
@@ -150,10 +160,22 @@ function cambiarPeriodo() {
 /* ---------- Carga de datos ---------- */
 
 async function cargarMeta() {
-    const resp = await fetch("/api/meta");
+    const habia = meta !== null;
+    const anterior = habia ? meta.ultima_actualizacion : null;
+    const resp = await api("/api/meta");
     meta = await resp.json();
     construirPeriodos();
     pintarUltima();
+    // Terminó una corrida (watcher de la PC o búsqueda en vivo): se recarga la lista sola.
+    if (habia && meta.ultima_actualizacion !== anterior) cargarNoticias();
+}
+
+// Revisa el estado cada 10 s mientras hay una corrida en curso y cada 60 s en reposo.
+function vigilar() {
+    setTimeout(async () => {
+        try { await cargarMeta(); } catch (e) { /* sin conexión: se reintenta */ }
+        vigilar();
+    }, meta && meta.en_curso ? 10000 : 60000);
 }
 
 function construirPeriodos() {
@@ -169,7 +191,10 @@ function pintarUltima() {
     const el = document.getElementById("ultima");
     const btn = document.getElementById("btn-refresh");
     btn.disabled = meta.en_curso;
-    if (meta.en_curso) { el.textContent = "Actualizando…"; return; }
+    if (meta.en_curso) {
+        el.textContent = meta.origen_en_curso === "nube" ? "Buscando noticias en vivo…" : "Actualizando…";
+        return;
+    }
     if (!meta.ultima_actualizacion) { el.textContent = "Sin actualizaciones todavía"; return; }
     const min = Math.round((Date.now() - new Date(meta.ultima_actualizacion)) / 60000);
     el.textContent = `Última actualización: ${min < 1 ? "hace instantes" : min < 60 ? `hace ${min} min`
@@ -193,7 +218,7 @@ async function cargarNoticias() {
     params.set("mes", mes);
     params.set("anio", anio);
     try {
-        const resp = await fetch(`/api/news?${params}`);
+        const resp = await api(`/api/news?${params}`);
         if (!resp.ok) throw new Error(`Error del servidor: ${resp.status}`);
         const datos = await resp.json();
         if (peticion !== ultimaPeticion) return;  // llegó tarde: ya hay una consulta más nueva
@@ -289,14 +314,8 @@ async function actualizar() {
     const btn = document.getElementById("btn-refresh");
     btn.disabled = true;
     document.getElementById("ultima").textContent = "Actualizando…";
-    await fetch("/api/actualizar", { method: "POST" });
-    const espera = setInterval(async () => {
-        await cargarMeta();
-        if (!meta.en_curso) {
-            clearInterval(espera);
-            cargarNoticias();
-        }
-    }, 10000);
+    await api("/api/actualizar", { method: "POST" });
+    await cargarMeta();  // vigilar() pasa a revisar cada 10 s y recarga la lista al terminar
 }
 
 async function valorarSeleccionadas() {
@@ -305,7 +324,7 @@ async function valorarSeleccionadas() {
     btn.textContent = "Valorando…";
     try {
         const items = [...seleccion.values()];
-        const resp = await fetch("/api/valorar", {
+        const resp = await api("/api/valorar", {
             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }),
         });
         const data = await resp.json();
@@ -324,7 +343,7 @@ async function valorarSeleccionadas() {
 }
 
 async function descargar(url, cuerpo, nombre) {
-    const resp = await fetch(url, {
+    const resp = await api(url, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo),
     });
     if (!resp.ok) { alert("No se pudo generar el archivo."); return; }
@@ -371,7 +390,7 @@ async function generarGuion() {
     const btn = document.getElementById("btn-guion");
     btn.disabled = true;
     try {
-        const resp = await fetch("/api/guion", {
+        const resp = await api("/api/guion", {
             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noticias: items }),
         });
         const data = await resp.json();
@@ -404,7 +423,7 @@ async function abrirHistorial() {
     const lista = document.getElementById("lista-guiones");
     lista.innerHTML = "<li>Cargando…</li>";
     abrirModal("modal-historial");
-    const guiones = await (await fetch("/api/guiones")).json();
+    const guiones = await (await api("/api/guiones")).json();
     lista.innerHTML = guiones.length ? guiones.map(g => `
         <li onclick="abrirGuion(${g.id})">
             ${escapeHtml(g.titulos.slice(0, 3).join(" · "))}${g.titulos.length > 3 ? " …" : ""}
@@ -413,7 +432,7 @@ async function abrirHistorial() {
 }
 
 async function abrirGuion(id) {
-    const g = await (await fetch(`/api/guiones/${id}`)).json();
+    const g = await (await api(`/api/guiones/${id}`)).json();
     cerrarModal("modal-historial");
     mostrarGuion(g.texto, `Guion del ${new Date(g.creado).toLocaleString("es-SV")}.`);
 }
@@ -436,7 +455,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("select-orden").value = filtros.orden;
         actualizarContador();
         await cargarNoticias();
-        setInterval(async () => { await cargarMeta(); }, 60000);
+        vigilar();
     } catch (err) {
         document.getElementById("news-container").innerHTML =
             `<p class="error-msg">No se pudo conectar con el servidor: ${escapeHtml(err.message)}</p>`;
