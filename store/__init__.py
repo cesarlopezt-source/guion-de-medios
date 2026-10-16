@@ -1,4 +1,4 @@
-"""Acceso a datos. El motor depende de MODO: SQLite en la PC, Postgres (Neon) en la nube.
+"""Acceso a datos. El motor depende de MODO: SQLite en la PC, Postgres (Supabase) en la nube.
 
 Los dos motores (store.sqlite y store.postgres) tienen la misma interfaz; el resto del código
 llama a store.<función> sin saber cuál está activo.

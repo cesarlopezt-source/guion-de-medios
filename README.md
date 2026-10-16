@@ -31,13 +31,15 @@ Después de cambiar la configuración, reinicia el portal: `Stop-ScheduledTask G
 
 ## En línea (desde cualquier equipo)
 
-La misma aplicación corre también en **Render** (`MODO=nube`, con contraseña) sobre una base **Neon** (Postgres):
+La misma aplicación corre también en **Render** (`MODO=nube`, con contraseña) sobre una base **Supabase** (Postgres):
 
-- **PC encendida:** cada corrida del watcher baja de Neon lo que la página encontró en vivo, recolecta y sube artículos, noticias, estado de fuentes, enlaces y guiones. Para activarlo basta con poner `DATABASE_URL` en el `.env` de la PC.
-- **PC apagada:** si los datos en Neon tienen más de 2 horas, la página de Render busca en vivo (1 a 3 min) y guarda lo encontrado en Neon. El botón Actualizar hace lo mismo.
-- Neon guarda las noticias agrupadas para siempre y los artículos sueltos solo del mes actual y el anterior. La PC conserva todo.
+- **PC encendida:** cada corrida del watcher baja de Supabase lo que la página encontró en vivo, recolecta y sube artículos, noticias, estado de fuentes, enlaces y guiones. Para activarlo basta con poner `DATABASE_URL` en el `.env` de la PC.
+- **PC apagada:** si los datos en Supabase tienen más de 2 horas, la página de Render busca en vivo (1 a 3 min) y guarda lo encontrado en Supabase. El botón Actualizar hace lo mismo.
+- Supabase guarda las noticias agrupadas para siempre y los artículos sueltos solo del mes actual y el anterior. La PC conserva todo.
 - Render gratis se duerme a los 15 min sin uso; no hay ningún cron que lo despierte, así que las horas gratis alcanzan de sobra.
 - El estado de la sincronización aparece en **Estado de fuentes** como "Sincronización con la nube".
+
+Dirección de Supabase: **Connect → Session pooler** (no "Transaction pooler": la sincronización usa tablas temporales y bloqueos de sesión). Se copia el URI con la contraseña de la base puesta en lugar de `[YOUR-PASSWORD]`.
 
 Publicación: `render.yaml` (Blueprint). En Render se cargan `DATABASE_URL`, `APP_PASSWORD` y `GEMINI_API_KEY`; `FLASK_SECRET_KEY` la genera Render.
 

@@ -171,7 +171,7 @@ async function cargarMeta() {
 }
 
 // Revisa el estado cada 10 s mientras hay una corrida en curso y cada 60 s en reposo.
-// Con la pestaña oculta o 30 min sin actividad deja de consultar, para que Render y Neon
+// Con la pestaña oculta o 30 min sin actividad deja de consultar, para que Render y Supabase
 // puedan dormirse y no gasten las horas gratis; al volver retoma sola.
 const INACTIVIDAD_MS = 30 * 60 * 1000;
 let ultimaActividad = Date.now();

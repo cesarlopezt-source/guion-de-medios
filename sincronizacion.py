@@ -1,4 +1,4 @@
-"""Sincronización entre la base de la PC (SQLite) y la de la nube (Neon), dentro de cada corrida del watcher.
+"""Sincronización entre la base de la PC (SQLite) y la de la nube (Supabase), dentro de cada corrida del watcher.
 
 antes():     toma el bloqueo en la nube y baja lo que la página encontró en vivo (artículos y guiones).
 despues():   sube artículos, noticias del mes, estado de fuentes, enlaces y guiones; poda la nube.

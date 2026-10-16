@@ -1,7 +1,7 @@
-"""Motor Postgres de store (Neon, en la nube). Misma interfaz que store.sqlite.
+"""Motor Postgres de store (Supabase, en la nube). Misma interfaz que store.sqlite.
 
 El parámetro `db_path` es el DSN de conexión; None = ajustes.DATABASE_URL.
-Se abre una conexión por llamada: Neon cierra las conexiones ociosas.
+Se abre una conexión por llamada: Supabase cierra las conexiones ociosas.
 """
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -131,7 +131,7 @@ def guardar_articulos(articulos: list, db_path=None, origen: str = "pc") -> int:
         for a in articulos
     ]
     with _conectar(db_path) as conn:
-        # Una tabla temporal y un solo INSERT ... SELECT evita miles de idas y vueltas a Neon.
+        # Una tabla temporal y un solo INSERT ... SELECT evita miles de idas y vueltas a Supabase.
         conn.execute("CREATE TEMP TABLE tmp_articulos (LIKE articulos INCLUDING DEFAULTS) ON COMMIT DROP")
         with conn.cursor() as cur:
             with cur.copy(
