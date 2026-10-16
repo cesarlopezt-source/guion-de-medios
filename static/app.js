@@ -6,6 +6,7 @@ const FILTROS_INICIALES = {
     paises: ["SV"],
     temas: ["Economía", "Inversión", "Política", "Coyuntura", "Social"],
     personajes: [],
+    partidos: [],
     orden: "importancia",
 };
 
@@ -37,12 +38,16 @@ function escapeHtml(s) {
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// La lista "personajes" de cada noticia trae también los partidos; en la tarjeta van separados.
+const partidosDe = n => n.personajes.filter(p => meta.partidos.includes(p));
+const personasDe = n => n.personajes.filter(p => !meta.partidos.includes(p));
+
 /* ---------- Filtros (recordados en el navegador) ---------- */
 
 function cargarFiltros() {
     try {
         const guardado = JSON.parse(localStorage.getItem(CLAVE_FILTROS));
-        if (guardado && Array.isArray(guardado.paises)) return { ...FILTROS_INICIALES, ...guardado };
+        if (guardado && Array.isArray(guardado.paises)) return structuredClone({ ...FILTROS_INICIALES, ...guardado });
     } catch (e) { /* almacenamiento no disponible: se usan los iniciales */ }
     return structuredClone(FILTROS_INICIALES);
 }
@@ -55,7 +60,10 @@ const MENUS = [
     { grupo: "paises", titulo: "Países" },
     { grupo: "temas", titulo: "Temas" },
     { grupo: "personajes", titulo: "Personajes" },
+    { grupo: "partidos", titulo: "Partidos" },
 ];
+// En estos menús "Todos" = no filtrar; las casillas individuales eligen a quién buscar.
+const VACIO_ES_TODOS = ["personajes", "partidos"];
 
 function opcionesDe(grupo) {
     if (grupo === "paises") return meta.paises.map(p => ({ valor: p.codigo, texto: p.nombre }));
@@ -100,7 +108,7 @@ document.addEventListener("click", e => {
 function resumen(grupo) {
     const marcados = filtros[grupo];
     const total = opcionesDe(grupo).length;
-    if (marcados.length === total || (grupo === "personajes" && marcados.length === 0)) return "Todos";
+    if (marcados.length === total || (VACIO_ES_TODOS.includes(grupo) && marcados.length === 0)) return "Todos";
     if (marcados.length === 0) return "Ninguno";
     if (marcados.length === 1) {
         return (opcionesDe(grupo).find(o => o.valor === marcados[0]) || { texto: marcados[0] }).texto;
@@ -113,8 +121,7 @@ function pintarMenus() {
         const grupo = dd.dataset.grupo;
         const marcados = filtros[grupo];
         const todos = resumen(grupo) === "Todos";
-        // En personajes, "Todos" va marcado solo y las casillas individuales eligen a quién filtrar.
-        const todosMarcado = grupo === "personajes" ? marcados.length === 0 : todos;
+        const todosMarcado = VACIO_ES_TODOS.includes(grupo) ? marcados.length === 0 : todos;
         dd.querySelectorAll("input").forEach(chk => {
             chk.checked = chk.dataset.todos ? todosMarcado : marcados.includes(chk.value);
         });
@@ -131,8 +138,8 @@ function alternar(grupo, valor) {
 }
 
 function alternarTodos(grupo, valores) {
-    if (grupo === "personajes") {
-        filtros.personajes = [];  // "Todos" en personajes = no filtrar por personaje
+    if (VACIO_ES_TODOS.includes(grupo)) {
+        filtros[grupo] = [];  // "Todos" = no filtrar por este menú
     } else {
         filtros[grupo] = filtros[grupo].length === valores.length ? [] : [...valores];
     }
@@ -239,7 +246,8 @@ async function cargarNoticias() {
     }
     const params = new URLSearchParams({
         paises: filtros.paises.join(","), temas: filtros.temas.join(","),
-        personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","), orden: filtros.orden,
+        personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","),
+        partidos: (resumen("partidos") === "Todos" ? [] : filtros.partidos).join(","), orden: filtros.orden,
     });
     const [anio, mes] = periodo ? [periodo.anio, periodo.mes] : meta.mes_actual;
     params.set("mes", mes);
@@ -293,7 +301,8 @@ function pintarNoticias() {
   </div>
   <div class="news-title">${escapeHtml(n.titulo)}</div>
   ${n.resumen ? `<div class="news-summary">${escapeHtml(n.resumen)}</div>` : ""}
-  ${n.personajes.length ? `<div class="personajes">👤 ${n.personajes.map(escapeHtml).join(", ")}</div>` : ""}
+  ${personasDe(n).length ? `<div class="personajes">👤 ${personasDe(n).map(escapeHtml).join(", ")}</div>` : ""}
+  ${partidosDe(n).length ? `<div class="personajes">🏛️ ${partidosDe(n).map(escapeHtml).join(", ")}</div>` : ""}
   <div class="card-sources">${fuentes}</div>
   ${sel && valoracion ? `
   <div class="card-valoracion">
@@ -478,6 +487,7 @@ document.addEventListener("keydown", e => {
         filtros.paises = filtros.paises.filter(p => meta.paises.some(x => x.codigo === p));
         filtros.temas = filtros.temas.filter(t => meta.temas.includes(t));
         filtros.personajes = filtros.personajes.filter(p => meta.personajes.includes(p));
+        filtros.partidos = filtros.partidos.filter(p => meta.partidos.includes(p));
         pintarMenus();
         document.getElementById("select-orden").value = filtros.orden;
         actualizarContador();

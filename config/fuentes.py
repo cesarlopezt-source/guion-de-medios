@@ -1,5 +1,6 @@
 from urllib.parse import quote_plus, urlparse
 
+from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 
 # Lectura web genérica: sirve para portadas que usan <article> con titular en h2/h3.
@@ -78,7 +79,7 @@ def _url_google_news(consulta: str, pais: str) -> str:
 
 
 def consultas_google_news() -> list:
-    """Una búsqueda por medio (site:dominio) y una por personaje, filtrada a medios conocidos.
+    """Una búsqueda por medio (site:dominio) y una por personaje y por partido, filtradas a medios conocidos.
 
     El parámetro gl de Google News no limita los medios al país, por eso se usa site:.
     """
@@ -95,6 +96,11 @@ def consultas_google_news() -> list:
         consultas.append({
             "nombre": f"Google News · Personaje · {nombre}", "pais": "SV", "tipo": "google_news",
             "activa": True, "solo_medios_conocidos": True, "url": _url_google_news(f'"{nombre}"', "SV"),
+        })
+    for nombre, p in PARTIDOS.items():
+        consultas.append({
+            "nombre": f"Google News · Partido · {nombre}", "pais": "SV", "tipo": "google_news",
+            "activa": True, "solo_medios_conocidos": True, "url": _url_google_news(p["busqueda"], "SV"),
         })
     return consultas
 

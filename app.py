@@ -16,6 +16,7 @@ import store
 import valorador
 import watcher
 from config.paises import PAISES
+from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 from config.temas import TEMAS
 from ia import ConfigError
@@ -178,6 +179,7 @@ def api_meta():
         "paises": [{"codigo": c, "nombre": n} for c, n in PAISES.items()],
         "temas": TEMAS_UI,
         "personajes": list(PERSONAJES),
+        "partidos": list(PARTIDOS),
         "ultima_actualizacion": ultima["fin"] if ultima else None,
         "meses": [list(m) for m in store.meses_disponibles()],
         "en_curso": origen_en_curso is not None,
@@ -201,7 +203,7 @@ def api_news():
     if not 1 <= mes <= 12:
         return jsonify({"error": "Mes inválido"}), 400
 
-    noticias = filtrar(store.obtener_noticias(mes, anio), _csv("paises"), _csv("temas"), _csv("personajes"))
+    noticias = filtrar(store.obtener_noticias(mes, anio), _csv("paises"), _csv("temas"), _csv("personajes"), _csv("partidos"))
     noticias = ordenar(noticias, request.args.get("orden", "importancia"))
 
     if (mes, anio) != (ahora.month, ahora.year):

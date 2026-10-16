@@ -12,5 +12,4 @@ PERSONAJES = {
     "Christian Guevara": ["christian guevara"],  # jefe de fracción de Nuevas Ideas
     "Claudia Ortiz": ["claudia ortiz"],  # diputada de Vamos
     "Marcela Villatoro": ["marcela villatoro"],  # diputada de ARENA
-    "FMLN": ["fmln", "farabundo martí"],
 }

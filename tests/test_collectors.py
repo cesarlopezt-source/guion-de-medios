@@ -73,6 +73,11 @@ def test_consultas_personaje_solo_medios_conocidos():
     assert q[0]["solo_medios_conocidos"] is True
 
 
+def test_consultas_partido_solo_medios_conocidos():
+    q = [c for c in consultas_google_news() if c["nombre"] == "Google News · Partido · ARENA"]
+    assert len(q) == 1 and q[0]["solo_medios_conocidos"] is True and "partido+ARENA" in q[0]["url"]
+
+
 def test_google_news_solo_medios_conocidos_filtra_y_asigna_pais():
     f = {**F, "tipo": "google_news", "solo_medios_conocidos": True}
     a = google_news.parsear(leer("google_news.xml"), f)

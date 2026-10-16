@@ -1,10 +1,11 @@
 from clusterer import agrupar
+from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 from config.temas import TEMAS
 from scorer import estrellas, puntuar
 
 _ORDEN_TEMAS = list(TEMAS)
-_ORDEN_PERSONAJES = list(PERSONAJES)
+_ORDEN_PERSONAJES = list(PERSONAJES) + list(PARTIDOS)
 
 
 def _union_ordenada(listas, orden: list) -> list:
@@ -49,13 +50,15 @@ def construir_noticias(articulos: list) -> list:
     return resultado
 
 
-def filtrar(noticias: list, paises: set, temas: set, personajes: set) -> list:
-    """País marcado Y algún tema marcado Y (si hay personajes marcados) algún personaje marcado."""
+def filtrar(noticias: list, paises: set, temas: set, personajes: set, partidos: set = frozenset()) -> list:
+    """País marcado Y algún tema marcado Y (si hay personajes marcados) algún personaje marcado
+    Y (si hay partidos marcados) algún partido marcado."""
     return [
         n for n in noticias
         if n["pais"] in paises
         and temas.intersection(n["temas"])
         and (not personajes or personajes.intersection(n["personajes"]))
+        and (not partidos or partidos.intersection(n["personajes"]))
     ]
 
 

@@ -52,6 +52,12 @@ def test_news_personaje(client):
     assert titulos(client.get("/api/news?paises=SV,GT&temas=Economía&personajes=Nayib Bukele")) == ["sv-eco-bukele"]
 
 
+def test_news_partido(client):
+    base = client.get("/api/news?paises=SV&temas=Economía").get_json()
+    assert client.get("/api/news?paises=SV&temas=Economía&partidos=").get_json() == base
+    assert client.get("/api/news?paises=SV&temas=Economía&partidos=ARENA").get_json() == []
+
+
 def test_news_orden_importancia_por_defecto(client):
     assert titulos(client.get("/api/news?paises=SV&temas=Economía")) == ["sv-eco-bukele", "sv-eco"]
 
@@ -68,7 +74,8 @@ def test_meta_listas(client):
     m = client.get("/api/meta").get_json()
     assert [p["codigo"] for p in m["paises"]] == ["SV", "GT", "HN", "NI", "CR", "PA", "REG"]
     assert m["temas"][0] == "Economía" and m["temas"][-1] == "Otras"
-    assert "Nayib Bukele" in m["personajes"]
+    assert "Nayib Bukele" in m["personajes"] and "FMLN" not in m["personajes"]
+    assert m["partidos"][:3] == ["Nuevas Ideas", "ARENA", "FMLN"]
     assert m["meses"] == [[AHORA.year, AHORA.month]] and m["en_curso"] is False
     assert m["ultima_actualizacion"] is None
 

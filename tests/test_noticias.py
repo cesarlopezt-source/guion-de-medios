@@ -82,3 +82,11 @@ def test_primera_fuente_es_el_articulo_mas_antiguo():
     n = construir_noticias(a)[0]
     assert n["fuentes"][0]["url"] == "https://lpg/1"
     assert n["titulo"].endswith("según BCR")
+
+
+def test_filtro_partidos_aparte_de_personajes():
+    ns = [nt("SV", ["Política"], ["Nayib Bukele"]), nt("SV", ["Política"], ["Nayib Bukele", "Nuevas Ideas"]),
+          nt("SV", ["Política"], ["ARENA"])]
+    assert len(filtrar(ns, {"SV"}, {"Política"}, set(), {"Nuevas Ideas", "ARENA"})) == 2
+    assert len(filtrar(ns, {"SV"}, {"Política"}, {"Nayib Bukele"}, {"Nuevas Ideas"})) == 1
+    assert len(filtrar(ns, {"SV"}, {"Política"}, set(), set())) == 3
