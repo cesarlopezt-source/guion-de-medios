@@ -147,10 +147,18 @@ def _configurar_log() -> None:
         raiz.addHandler(h)
 
 
+def _sincronizacion_por_defecto():
+    """En la PC, si .env tiene DATABASE_URL, cada corrida se sincroniza con la nube."""
+    if ajustes.MODO != "pc" or not ajustes.DATABASE_URL:
+        return None
+    from sincronizacion import Sincronizacion
+    return Sincronizacion()
+
+
 if __name__ == "__main__":
     _configurar_log()
     try:
-        print(correr())
+        print(correr(sincronizar=_sincronizacion_por_defecto()))
     except Exception:
         log.exception("La corrida falló")
         raise

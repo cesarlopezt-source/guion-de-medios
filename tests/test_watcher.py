@@ -228,3 +228,14 @@ def test_sincronizar_al_final_false_si_falla(monkeypatch, rutas):
     with pytest.raises(RuntimeError):
         watcher.correr([F1], ahora=AHORA, sincronizar=sync, **rutas)
     assert sync.llamadas[-1] == ("al_final", False)
+
+
+def test_sincronizacion_por_defecto_solo_con_database_url(monkeypatch):
+    import ajustes
+    monkeypatch.setattr(ajustes, "MODO", "pc")
+    monkeypatch.setattr(ajustes, "DATABASE_URL", None)
+    assert watcher._sincronizacion_por_defecto() is None
+    monkeypatch.setattr(ajustes, "DATABASE_URL", "postgresql://x")
+    assert type(watcher._sincronizacion_por_defecto()).__name__ == "Sincronizacion"
+    monkeypatch.setattr(ajustes, "MODO", "nube")
+    assert watcher._sincronizacion_por_defecto() is None
