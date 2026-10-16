@@ -154,3 +154,88 @@ def test_verifica_enlaces_de_meses_anteriores(monkeypatch, rutas):
     monkeypatch.setattr(link_checker, "check_urls", lambda urls: {u: False for u in urls})
     watcher.correr([F1], ahora=AHORA, **rutas)
     assert store.obtener_estado_enlaces(["https://a/viejo"], rutas["db_path"]) == {"https://a/viejo": False}
+
+
+# ---- Bloqueo por base, origen y sincronización ----
+
+class SyncFalso:
+    def __init__(self, antes=True):
+        self._antes = antes
+        self.llamadas = []
+
+    def antes(self):
+        self.llamadas.append("antes")
+        return self._antes
+
+    def despues(self, meses):
+        self.llamadas.append(("despues", meses))
+
+    def al_final(self, ok):
+        self.llamadas.append(("al_final", ok))
+
+
+def test_nube_usa_bloqueo_por_base(monkeypatch, rutas):
+    store.init_db(rutas["db_path"])
+    store.intentar_iniciar_corrida("pc", rutas["db_path"])
+    monkeypatch.setattr(watcher, "recolectar", lambda f: pytest.fail("no debía recolectar"))
+    r = watcher.correr([F1], ahora=AHORA, origen="nube", verificar_enlaces=False, **rutas)
+    assert r == {"ok": False, "motivo": "en_curso"}
+    assert not rutas["lock_path"].exists()
+
+
+def test_nube_guarda_origen_nube(monkeypatch, rutas):
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art("u1")], None))
+    assert watcher.correr([F1], ahora=AHORA, origen="nube", verificar_enlaces=False, **rutas)["ok"] is True
+    assert store.articulos_desde(None, rutas["db_path"])[0]["origen"] == "nube"
+    assert store.ultima_corrida(rutas["db_path"])["origen"] == "nube"
+
+
+def test_sin_verificar_enlaces_no_llama_link_checker(monkeypatch, rutas):
+    import link_checker
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art("u1")], None))
+    monkeypatch.setattr(link_checker, "check_urls", lambda urls: pytest.fail("no debía verificar"))
+    assert watcher.correr([F1], ahora=AHORA, verificar_enlaces=False, **rutas)["ok"] is True
+
+
+def test_corrida_fallida_se_cierra(monkeypatch, rutas):
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art("u1")], None))
+    monkeypatch.setattr(watcher, "clasificar", lambda a: (_ for _ in ()).throw(RuntimeError("x")))
+    with pytest.raises(RuntimeError):
+        watcher.correr([F1], ahora=AHORA, **rutas)
+    assert store.corrida_en_curso(rutas["db_path"]) is None
+    assert store.ultima_corrida(rutas["db_path"]) is None  # cerrada con ok = False
+
+
+def test_sincronizar_antes_false_cancela(monkeypatch, rutas):
+    sync = SyncFalso(antes=False)
+    monkeypatch.setattr(watcher, "recolectar", lambda f: pytest.fail("no debía recolectar"))
+    assert watcher.correr([F1], ahora=AHORA, sincronizar=sync, **rutas) == {"ok": False, "motivo": "en_curso"}
+    assert sync.llamadas == ["antes"]
+    assert store.corrida_en_curso(rutas["db_path"]) is None
+
+
+def test_sincronizar_recibe_meses_reconstruidos(monkeypatch, rutas):
+    sync = SyncFalso()
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art("u1")], None))
+    watcher.correr([F1], ahora=AHORA, sincronizar=sync, **rutas)
+    assert sync.llamadas == ["antes", ("despues", watcher.meses_a_reconstruir(AHORA)), ("al_final", True)]
+
+
+def test_sincronizar_al_final_false_si_falla(monkeypatch, rutas):
+    sync = SyncFalso()
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art("u1")], None))
+    monkeypatch.setattr(watcher, "clasificar", lambda a: (_ for _ in ()).throw(RuntimeError("x")))
+    with pytest.raises(RuntimeError):
+        watcher.correr([F1], ahora=AHORA, sincronizar=sync, **rutas)
+    assert sync.llamadas[-1] == ("al_final", False)
+
+
+def test_sincronizacion_por_defecto_solo_con_database_url(monkeypatch):
+    import ajustes
+    monkeypatch.setattr(ajustes, "MODO", "pc")
+    monkeypatch.setattr(ajustes, "DATABASE_URL", None)
+    assert watcher._sincronizacion_por_defecto() is None
+    monkeypatch.setattr(ajustes, "DATABASE_URL", "postgresql://x")
+    assert type(watcher._sincronizacion_por_defecto()).__name__ == "Sincronizacion"
+    monkeypatch.setattr(ajustes, "MODO", "nube")
+    assert watcher._sincronizacion_por_defecto() is None

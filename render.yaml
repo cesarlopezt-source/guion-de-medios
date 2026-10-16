@@ -1,0 +1,23 @@
+# Blueprint de Render: New → Blueprint → elegir este repositorio.
+services:
+  - type: web
+    name: guion-de-medios
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # Un solo proceso: la búsqueda en vivo corre en un hilo y no debe duplicarse.
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /login
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: MODO
+        value: nube
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
