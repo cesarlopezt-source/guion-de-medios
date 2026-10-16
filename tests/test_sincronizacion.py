@@ -150,3 +150,16 @@ def test_estado_sincronizacion_registrado(bases):
     corrida_completa(local, nube)
     estado = {e["fuente"]: e for e in sqlite.obtener_estado_fuentes(local)}[FUENTE_SYNC["nombre"]]
     assert estado["ok"] is True and estado["error"] is None
+
+
+def test_primera_sincronizacion_sube_todos_los_meses(bases, monkeypatch):
+    local, nube = bases
+    sqlite.reemplazar_noticias(9, 2026, [noticia("Sep")], local)
+    sqlite.reemplazar_noticias(10, 2026, [noticia("Oct")], local)
+    corrida_completa(local, nube)
+    assert [n["titulo"] for n in postgres.obtener_noticias(9, 2026, nube)] == ["Sep"]
+    subidos = []
+    original = postgres.reemplazar_noticias
+    monkeypatch.setattr(postgres, "reemplazar_noticias", lambda m, a, n, d=None: subidos.append((m, a)) or original(m, a, n, d))
+    corrida_completa(local, nube)
+    assert subidos == [(10, 2026)]  # después, solo los meses reconstruidos

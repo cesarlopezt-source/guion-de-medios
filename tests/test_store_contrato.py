@@ -186,3 +186,30 @@ def test_marcas(tmp_path):
     sqlite.guardar_marca("x", "2026-10-01", ruta)
     sqlite.guardar_marca("x", "2026-10-02", ruta)
     assert sqlite.obtener_marca("x", ruta) == "2026-10-02"
+
+
+def test_ultimo_intento_incluye_corridas_fallidas(m):
+    s, d = m
+    assert s.ultimo_intento(d) is None
+    c = s.intentar_iniciar_corrida("nube", d)
+    s.finalizar_corrida(c, 0, False, d)
+    assert s.ultima_corrida(d) is None
+    inicio = datetime.fromisoformat(s.ultimo_intento(d))
+    assert (datetime.now(timezone.utc) - inicio).total_seconds() < 60
+
+
+def test_postgres_conecta_con_keepalive_y_statement_timeout(monkeypatch):
+    from store import postgres
+    vistos = {}
+    monkeypatch.setattr(postgres.psycopg, "connect", lambda dsn, **kw: vistos.update(kw) or None)
+    postgres._conectar("postgresql://x")
+    assert vistos["keepalives_idle"] == 30 and vistos["keepalives_count"] == 3
+    assert "statement_timeout" in vistos["options"]
+
+
+def test_postgres_conserva_options_de_la_direccion(monkeypatch):
+    from store import postgres
+    vistos = {}
+    monkeypatch.setattr(postgres.psycopg, "connect", lambda dsn, **kw: vistos.update(kw) or None)
+    postgres._conectar("postgresql://x/db?options=-csearch_path%3Dt_abc")
+    assert "search_path=t_abc" in vistos["options"] and "statement_timeout" in vistos["options"]

@@ -33,6 +33,10 @@ store.init_db()
 log = logging.getLogger("portal")
 
 VIVO_HORAS = 2           # en la nube, si los datos son más viejos, se busca en vivo
+REINTENTO_MIN = 30       # tras un intento (aunque haya fallado) no se relanza solo antes de esto
+MAX_FALLOS_LOGIN = 5     # intentos fallidos por IP antes de bloquear
+BLOQUEO_LOGIN_MIN = 15
+_fallos_login = {}       # ip → [momentos de intentos fallidos]; un solo proceso (gunicorn --workers 1)
 _buscando = threading.Event()  # una sola búsqueda en vivo por proceso
 
 TEMAS_UI = list(TEMAS) + ["Otras"]
@@ -80,16 +84,34 @@ def exigir_sesion():
     return redirect("/login")
 
 
+def _ip_cliente() -> str:
+    # Render pone la IP real del visitante en X-Forwarded-For.
+    return (request.headers.get("X-Forwarded-For") or request.remote_addr or "?").split(",")[0].strip()
+
+
+def _fallos_recientes(ip: str) -> list:
+    limite = datetime.now(timezone.utc) - timedelta(minutes=BLOQUEO_LOGIN_MIN)
+    recientes = [t for t in _fallos_login.get(ip, []) if t > limite]
+    _fallos_login[ip] = recientes
+    return recientes
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
     if request.method == "POST":
+        ip = _ip_cliente()
+        if len(_fallos_recientes(ip)) >= MAX_FALLOS_LOGIN:
+            return render_template(
+                "login.html", error=f"Demasiados intentos. Espera {BLOQUEO_LOGIN_MIN} minutos."), 429
         clave = os.environ.get("APP_PASSWORD", "")
         if clave and hmac.compare_digest(request.form.get("password", ""), clave):
+            _fallos_login.pop(ip, None)
             session.clear()
             session["ok"] = True
             session.permanent = True
             return redirect("/")
+        _fallos_login.setdefault(ip, []).append(datetime.now(timezone.utc))
         error = "Contraseña incorrecta"
     return render_template("login.html", error=error)
 
@@ -119,6 +141,11 @@ def lanzar_busqueda_en_vivo() -> bool:
     return True
 
 
+def _intento_reciente() -> bool:
+    intento = store.ultimo_intento()
+    return bool(intento) and datetime.now(timezone.utc) - datetime.fromisoformat(intento) < timedelta(minutes=REINTENTO_MIN)
+
+
 def _datos_viejos(ultima) -> bool:
     if not ultima:
         return True
@@ -141,7 +168,7 @@ def fuentes():
 def api_meta():
     ultima = store.ultima_corrida()
     if _en_nube():
-        if _datos_viejos(ultima):
+        if _datos_viejos(ultima) and not _intento_reciente():
             lanzar_busqueda_en_vivo()
         en_curso = store.corrida_en_curso()
         origen_en_curso = en_curso["origen"] if en_curso else ("nube" if _buscando.is_set() else None)

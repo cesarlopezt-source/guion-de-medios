@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -85,7 +86,16 @@ _CANDADO_CORRIDAS = 4711
 
 
 def _conectar(db_path=None):
-    return psycopg.connect(db_path or ajustes.DATABASE_URL, row_factory=dict_row, connect_timeout=15)
+    # keepalives + statement_timeout: si la red se corta en silencio, la consulta falla en ~1-2 min
+    # en lugar de quedarse colgada horas (y dejar dos watchers corriendo a la vez).
+    dsn = db_path or ajustes.DATABASE_URL
+    # Se suman a las opciones que ya traiga la dirección de conexión (no las reemplazan).
+    opciones = (conninfo_to_dict(dsn).get("options") or "") + " -c statement_timeout=120000"
+    return psycopg.connect(
+        dsn, row_factory=dict_row, connect_timeout=15,
+        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3,
+        options=opciones.strip(),
+    )
 
 
 def _ahora() -> datetime:
@@ -411,3 +421,10 @@ def insertar_guiones(guiones: list, db_path=None) -> int:
                 (g["uid"], _ts(g["creado"]), Jsonb(g["noticias"]), g["texto"], g["palabras"], g["minutos"]),
             ).rowcount
     return nuevos
+
+
+def ultimo_intento(db_path=None):
+    """Inicio de la última corrida, haya terminado bien, mal o siga abierta."""
+    with _conectar(db_path) as conn:
+        fila = conn.execute("SELECT inicio FROM corridas ORDER BY inicio DESC LIMIT 1").fetchone()
+    return _iso(fila["inicio"]) if fila else None

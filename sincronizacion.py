@@ -95,8 +95,13 @@ class Sincronizacion:
             self.subidos = postgres.guardar_articulos(articulos, self.nube)
             sqlite.guardar_marca("subida_articulos", articulos[-1]["recolectado"], self.local)
 
-        for mes, anio in meses:
+        # La primera vez se sube todo el histórico; después, solo los meses reconstruidos en la corrida.
+        inicial = sqlite.obtener_marca("subida_noticias_inicial", self.local) is None
+        meses_a_subir = sorted(set(meses) | {(m, a) for a, m in sqlite.meses_disponibles(self.local)}) if inicial else meses
+        for mes, anio in meses_a_subir:
             postgres.reemplazar_noticias(mes, anio, sqlite.obtener_noticias(mes, anio, self.local), self.nube)
+        if inicial:
+            sqlite.guardar_marca("subida_noticias_inicial", datetime.now(timezone.utc).isoformat(), self.local)
 
         for e in sqlite.obtener_estado_fuentes(self.local):
             if e["fuente"] == FUENTE_SYNC["nombre"]:

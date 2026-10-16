@@ -171,12 +171,39 @@ async function cargarMeta() {
 }
 
 // Revisa el estado cada 10 s mientras hay una corrida en curso y cada 60 s en reposo.
+// Con la pestaña oculta o 30 min sin actividad deja de consultar, para que Render y Neon
+// puedan dormirse y no gasten las horas gratis; al volver retoma sola.
+const INACTIVIDAD_MS = 30 * 60 * 1000;
+let ultimaActividad = Date.now();
+let vigilando = false;
+let detenido = false;  // el ciclo se paró por pestaña oculta o inactividad
+
+function pausado() {
+    return document.hidden || Date.now() - ultimaActividad > INACTIVIDAD_MS;
+}
+
 function vigilar() {
+    if (vigilando) return;
+    vigilando = true;
     setTimeout(async () => {
+        vigilando = false;
+        if (pausado()) { detenido = true; return; }  // se reanuda con reanudar()
         try { await cargarMeta(); } catch (e) { /* sin conexión: se reintenta */ }
         vigilar();
     }, meta && meta.en_curso ? 10000 : 60000);
 }
+
+async function reanudar() {
+    ultimaActividad = Date.now();
+    if (!detenido || document.hidden) return;
+    detenido = false;
+    try { await cargarMeta(); } catch (e) { /* sin conexión */ }
+    vigilar();
+}
+
+["click", "keydown", "scroll", "touchstart"].forEach(ev =>
+    document.addEventListener(ev, reanudar, { passive: true }));
+document.addEventListener("visibilitychange", () => { if (!document.hidden) reanudar(); });
 
 function construirPeriodos() {
     const actual = meta.mes_actual;  // en hora de El Salvador, no la del navegador

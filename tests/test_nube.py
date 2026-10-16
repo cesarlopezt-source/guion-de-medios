@@ -107,3 +107,31 @@ def test_busqueda_en_vivo_llama_watcher_en_modo_nube(nube, monkeypatch):
     nube._buscar()
     assert llamadas == [{"origen": "nube", "verificar_enlaces": False}]
     assert not nube._buscando.is_set()
+
+
+def test_no_relanza_si_el_ultimo_intento_fallo_hace_poco(nube):
+    c = store.intentar_iniciar_corrida("nube")
+    store.finalizar_corrida(c, 0, False)
+    cli = nube.app.test_client()
+    entrar(cli)
+    cli.get("/api/meta")
+    assert HiloFalso.lanzados == 0
+    assert cli.post("/api/actualizar").get_json() == {"iniciado": True}  # el botón sí puede reintentar
+
+
+def test_login_bloquea_tras_varios_intentos_fallidos(nube):
+    nube._fallos_login.clear()
+    cli = nube.app.test_client()
+    for _ in range(nube.MAX_FALLOS_LOGIN):
+        assert cli.post("/login", data={"password": "mala"}).status_code == 200
+    r = cli.post("/login", data={"password": "clave"})
+    assert r.status_code == 429 and "Demasiados intentos" in r.get_data(as_text=True)
+    assert cli.get("/").status_code == 302
+
+
+def test_login_correcto_limpia_fallos(nube):
+    nube._fallos_login.clear()
+    cli = nube.app.test_client()
+    cli.post("/login", data={"password": "mala"})
+    entrar(cli)
+    assert not nube._fallos_login

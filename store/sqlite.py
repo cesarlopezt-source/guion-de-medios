@@ -495,3 +495,11 @@ def guardar_marca(clave: str, valor: str, db_path: Path = None) -> None:
             "ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor", (clave, valor),
         )
     conn.close()
+
+
+def ultimo_intento(db_path: Path = None):
+    """Inicio de la última corrida, haya terminado bien, mal o siga abierta."""
+    conn = _conectar(db_path)
+    fila = conn.execute("SELECT inicio FROM corridas ORDER BY inicio DESC LIMIT 1").fetchone()
+    conn.close()
+    return fila["inicio"] if fila else None
