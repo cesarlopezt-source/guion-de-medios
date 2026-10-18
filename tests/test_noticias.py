@@ -97,7 +97,8 @@ def test_filtro_ambito():
     gt_sv["menciona_sv"] = True
     ns = [sv, gt, gt_sv]
     todos = {"SV", "GT"}
-    assert filtrar(ns, todos, {"Economía"}, set(), set(), {"Nacionales"}) == [sv, gt_sv]
+    # Una nota de otro país que menciona a El Salvador es internacional: solo sale si se marca Internacionales.
+    assert filtrar(ns, todos, {"Economía"}, set(), set(), {"Nacionales"}) == [sv]
     assert filtrar(ns, todos, {"Economía"}, set(), set(), {"Internacionales"}) == [gt, gt_sv]
     assert len(filtrar(ns, todos, {"Economía"}, set(), set(), set())) == 3
 

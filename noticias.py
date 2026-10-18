@@ -71,13 +71,8 @@ def _pais_marcado(noticia: dict, paises: set) -> bool:
 
 
 def ambitos_de(noticia: dict) -> set:
-    """Nacionales = de El Salvador o que lo mencionan; Internacionales = de cualquier otro país."""
-    resultado = set()
-    if noticia["pais"] == "SV" or noticia.get("menciona_sv"):
-        resultado.add("Nacionales")
-    if noticia["pais"] != "SV":
-        resultado.add("Internacionales")
-    return resultado
+    """Nacionales = de El Salvador; Internacionales = de cualquier otro país (aunque mencione a El Salvador)."""
+    return {"Nacionales"} if noticia["pais"] == "SV" else {"Internacionales"}
 
 
 def filtrar(noticias: list, paises: set, temas: set, personajes: set, partidos: set = frozenset(),

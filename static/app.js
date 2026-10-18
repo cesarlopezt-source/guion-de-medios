@@ -8,7 +8,7 @@ const FILTROS_INICIALES = {
     temas: ["Economía", "Inversión", "Finanzas", "Negocios", "Activos Digitales", "Política", "Coyuntura", "Social"],
     personajes: [],
     partidos: [],
-    ambitos: [],
+    ambitos: ["Nacionales"],  // las internacionales se ven solo si se marcan
     temasConocidos: null,  // temas que existían la última vez; los nuevos se marcan solos
     orden: "importancia",
 };
@@ -67,7 +67,7 @@ const MENUS = [
     { grupo: "ambitos", titulo: "Ámbito" },
 ];
 // En estos menús no marcar nada = "Sin filtro" (salen todas las noticias); las casillas eligen a quién buscar.
-const VACIO_ES_TODOS = ["personajes", "partidos", "ambitos"];
+const VACIO_ES_TODOS = ["personajes", "partidos"];
 const textoTodos = grupo => VACIO_ES_TODOS.includes(grupo) ? "Sin filtro" : "Todos";
 
 function opcionesDe(grupo) {
@@ -243,17 +243,17 @@ function pintarUltima() {
 async function cargarNoticias() {
     const cont = document.getElementById("news-container");
     const peticion = ++ultimaPeticion;
-    if (!filtros.paises.length || !filtros.temas.length) {
+    if (!filtros.paises.length || !filtros.temas.length || !filtros.ambitos.length) {
         noticias = [];
         document.getElementById("result-count").textContent = "";
-        cont.innerHTML = '<p class="status-msg">Marca al menos un país y un tema.</p>';
+        cont.innerHTML = '<p class="status-msg">Marca al menos un país, un tema y un ámbito.</p>';
         return;
     }
     const params = new URLSearchParams({
         paises: filtros.paises.join(","), temas: filtros.temas.join(","),
         personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","),
         partidos: (resumen("partidos") === "Todos" ? [] : filtros.partidos).join(","),
-        ambitos: (resumen("ambitos") === "Todos" ? [] : filtros.ambitos).join(","), orden: filtros.orden,
+        ambitos: filtros.ambitos.join(","), orden: filtros.orden,
     });
     const [anio, mes] = periodo ? [periodo.anio, periodo.mes] : meta.mes_actual;
     params.set("mes", mes);
@@ -555,6 +555,8 @@ document.addEventListener("keydown", e => {
         filtros.personajes = filtros.personajes.filter(p => meta.personajes.includes(p));
         filtros.partidos = filtros.partidos.filter(p => meta.partidos.includes(p));
         filtros.ambitos = filtros.ambitos.filter(a => meta.ambitos.includes(a));
+        // Antes "ninguno" quería decir "sin filtro"; ahora se arranca solo con las nacionales.
+        if (!filtros.ambitos.length) filtros.ambitos = ["Nacionales"];
         // Temas agregados después de la última visita: se marcan para que se vean.
         // (Sin registro previo, los nuevos son los de octubre de 2026.)
         const conocidos = filtros.temasConocidos
