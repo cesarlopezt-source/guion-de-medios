@@ -40,6 +40,7 @@ header h1 span { font-weight: 400; opacity: 0.75; }
 #ultima { color: #BDC3C7; }
 #header-right a { color: #AED6F1; text-decoration: none; }
 #header-right a:hover { text-decoration: underline; }
+.cerrar-sesion { border: 1px solid #AED6F1; padding: 0.2rem 0.65rem; border-radius: 6px; }
 #btn-refresh {
     background: var(--azul); color: white; border: none;
     padding: 0.5rem 1.1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem;

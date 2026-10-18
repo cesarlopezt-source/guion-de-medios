@@ -5,6 +5,7 @@ import secrets
 import subprocess
 import sys
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, session
@@ -37,6 +38,7 @@ log = logging.getLogger("portal")
 
 VIVO_HORAS = 2           # en la nube, si los datos son más viejos, se busca en vivo
 REINTENTO_MIN = 30       # tras un intento (aunque haya fallado) no se relanza solo antes de esto
+INACTIVIDAD_MIN = 30     # en la nube, la sesión se cierra tras este tiempo sin uso
 MAX_FALLOS_LOGIN = 5     # intentos fallidos por IP antes de bloquear
 BLOQUEO_LOGIN_MIN = 15
 _fallos_login = {}       # ip → [momentos de intentos fallidos]; un solo proceso (gunicorn --workers 1)
@@ -78,9 +80,23 @@ def _en_nube() -> bool:
 
 # ---------- Contraseña (solo en la nube) ----------
 
+def _sesion_vigente() -> bool:
+    """Sesión iniciada y usada en los últimos INACTIVIDAD_MIN minutos; si venció, se cierra.
+    El sondeo automático de /api/meta solo cuenta como uso si la página avisa actividad (?activo=1)."""
+    if not session.get("ok"):
+        return False
+    ahora = time.time()
+    if ahora - session.get("ultima", 0) > INACTIVIDAD_MIN * 60:
+        session.clear()
+        return False
+    if request.path != "/api/meta" or request.args.get("activo"):
+        session["ultima"] = ahora
+    return True
+
+
 @app.before_request
 def exigir_sesion():
-    if not _en_nube() or session.get("ok") or request.path == "/login" or request.path.startswith("/static/"):
+    if not _en_nube() or request.path == "/login" or request.path.startswith("/static/") or _sesion_vigente():
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "Sesión expirada"}), 401
@@ -112,6 +128,7 @@ def login():
             _fallos_login.pop(ip, None)
             session.clear()
             session["ok"] = True
+            session["ultima"] = time.time()
             session.permanent = True
             return redirect("/")
         _fallos_login.setdefault(ip, []).append(datetime.now(timezone.utc))
@@ -158,7 +175,7 @@ def _datos_viejos(ultima) -> bool:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", en_nube=_en_nube())
 
 
 @app.route("/fuentes")

@@ -177,7 +177,10 @@ function cambiarPeriodo() {
 async function cargarMeta() {
     const habia = meta !== null;
     const anterior = habia ? meta.ultima_actualizacion : null;
-    const resp = await api("/api/meta");
+    // Avisa si hubo actividad desde el sondeo anterior: en internet, solo eso mantiene abierta la sesión.
+    const activo = ultimaActividad > ultimoSondeo;
+    ultimoSondeo = Date.now();
+    const resp = await api(`/api/meta${activo ? "?activo=1" : ""}`);
     meta = await resp.json();
     construirPeriodos();
     pintarUltima();
@@ -190,6 +193,7 @@ async function cargarMeta() {
 // puedan dormirse y no gasten las horas gratis; al volver retoma sola.
 const INACTIVIDAD_MS = 30 * 60 * 1000;
 let ultimaActividad = Date.now();
+let ultimoSondeo = 0;
 let vigilando = false;
 let detenido = false;  // el ciclo se paró por pestaña oculta o inactividad
 

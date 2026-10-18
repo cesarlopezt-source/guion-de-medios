@@ -135,3 +135,46 @@ def test_login_correcto_limpia_fallos(nube):
     cli.post("/login", data={"password": "mala"})
     entrar(cli)
     assert not nube._fallos_login
+
+
+def _envejecer_sesion(cliente, minutos):
+    with cliente.session_transaction() as s:
+        s["ultima"] -= minutos * 60
+
+
+def test_sesion_se_cierra_tras_30_min_sin_uso(nube):
+    c = nube.app.test_client()
+    entrar(c)
+    _envejecer_sesion(c, 29)
+    assert c.get("/").status_code == 200   # usar la página renueva el plazo
+    _envejecer_sesion(c, 31)
+    assert c.get("/api/news?paises=SV&temas=Economía").status_code == 401
+    assert c.get("/").status_code == 302   # ya cerrada
+
+
+def test_sondeo_automatico_no_cuenta_como_uso(nube):
+    c = nube.app.test_client()
+    entrar(c)
+    _envejecer_sesion(c, 20)
+    assert c.get("/api/meta").status_code == 200
+    _envejecer_sesion(c, 11)               # 31 min desde el último uso real
+    assert c.get("/api/meta").status_code == 401
+
+
+def test_sondeo_con_actividad_en_la_pagina_si_cuenta(nube):
+    c = nube.app.test_client()
+    entrar(c)
+    _envejecer_sesion(c, 20)
+    assert c.get("/api/meta?activo=1").status_code == 200
+    _envejecer_sesion(c, 11)
+    assert c.get("/api/meta").status_code == 200
+
+
+def test_boton_cerrar_sesion_solo_en_la_nube(nube, monkeypatch):
+    c = nube.app.test_client()
+    entrar(c)
+    assert 'href="/logout"' in c.get("/").get_data(as_text=True)
+    c.get("/logout")
+    assert c.get("/").status_code == 302
+    monkeypatch.setattr(ajustes, "MODO", "pc")
+    assert 'href="/logout"' not in c.get("/").get_data(as_text=True)
