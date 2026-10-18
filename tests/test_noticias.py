@@ -108,3 +108,14 @@ def test_estados_unidos_incluye_notas_de_su_relacion_con_la_region():
     solo_sv = {**nt("SV", ["Economía"], []), "titulo": "Remesas crecen en El Salvador"}
     assert filtrar([tps, solo_sv], {"US"}, {"Economía"}, set()) == [tps]
     assert len(filtrar([tps, solo_sv], {"SV"}, {"Economía"}, set())) == 2
+
+
+def test_regiones_y_organismos():
+    eur = {**nt("SV", ["Economía"], []), "titulo": "España y El Salvador firman acuerdo comercial"}
+    asia = {**nt("SV", ["Economía"], ["FMI"]), "titulo": "China dona equipo a El Salvador"}
+    solo_espana = {**nt("SV", ["Economía"], []), "titulo": "España sube tasas"}
+    ns = [eur, asia, solo_espana]
+    assert filtrar(ns, {"EUR"}, {"Economía"}, set()) == [eur]
+    assert filtrar(ns, {"ASI"}, {"Economía"}, set()) == [asia]
+    assert filtrar(ns, {"SV"}, {"Economía"}, set(), organismos={"FMI"}) == [asia]
+    assert filtrar(ns, {"SV"}, {"Economía"}, set(), set(), {"Internacionales"}) == [eur, asia]

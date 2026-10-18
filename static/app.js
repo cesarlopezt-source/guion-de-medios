@@ -8,6 +8,7 @@ const FILTROS_INICIALES = {
     temas: ["Economía", "Inversión", "Finanzas", "Negocios", "Activos Digitales", "Política", "Coyuntura", "Social"],
     personajes: [],
     partidos: [],
+    organismos: [],
     ambitos: ["Nacionales"],  // las internacionales se ven solo si se marcan
     temasConocidos: null,  // temas que existían la última vez; los nuevos se marcan solos
     orden: "importancia",
@@ -41,9 +42,10 @@ function escapeHtml(s) {
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// La lista "personajes" de cada noticia trae también los partidos; en la tarjeta van separados.
+// La lista "personajes" de cada noticia trae también partidos y organismos; en la tarjeta van separados.
 const partidosDe = n => n.personajes.filter(p => meta.partidos.includes(p));
-const personasDe = n => n.personajes.filter(p => !meta.partidos.includes(p));
+const organismosDe = n => n.personajes.filter(p => meta.organismos.includes(p));
+const personasDe = n => n.personajes.filter(p => !meta.partidos.includes(p) && !meta.organismos.includes(p));
 
 /* ---------- Filtros (recordados en el navegador) ---------- */
 
@@ -64,10 +66,11 @@ const MENUS = [
     { grupo: "temas", titulo: "Temas" },
     { grupo: "personajes", titulo: "Personajes" },
     { grupo: "partidos", titulo: "Partidos" },
+    { grupo: "organismos", titulo: "Organismos" },
     { grupo: "ambitos", titulo: "Ámbito" },
 ];
 // En estos menús no marcar nada = "Sin filtro" (salen todas las noticias); las casillas eligen a quién buscar.
-const VACIO_ES_TODOS = ["personajes", "partidos"];
+const VACIO_ES_TODOS = ["personajes", "partidos", "organismos"];
 const textoTodos = grupo => VACIO_ES_TODOS.includes(grupo) ? "Sin filtro" : "Todos";
 
 function opcionesDe(grupo) {
@@ -253,6 +256,7 @@ async function cargarNoticias() {
         paises: filtros.paises.join(","), temas: filtros.temas.join(","),
         personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","),
         partidos: (resumen("partidos") === "Todos" ? [] : filtros.partidos).join(","),
+        organismos: (resumen("organismos") === "Todos" ? [] : filtros.organismos).join(","),
         ambitos: filtros.ambitos.join(","), orden: filtros.orden,
     });
     const [anio, mes] = periodo ? [periodo.anio, periodo.mes] : meta.mes_actual;
@@ -309,6 +313,7 @@ function pintarNoticias() {
   ${n.resumen ? `<div class="news-summary">${escapeHtml(n.resumen)}</div>` : ""}
   ${personasDe(n).length ? `<div class="personajes">👤 ${personasDe(n).map(escapeHtml).join(", ")}</div>` : ""}
   ${partidosDe(n).length ? `<div class="personajes">🏛️ ${partidosDe(n).map(escapeHtml).join(", ")}</div>` : ""}
+  ${organismosDe(n).length ? `<div class="personajes">🌐 ${organismosDe(n).map(escapeHtml).join(", ")}</div>` : ""}
   <div class="card-sources">${fuentes}</div>
   ${sel && valoracion ? `
   <div class="card-valoracion">
@@ -554,6 +559,7 @@ document.addEventListener("keydown", e => {
         filtros.temas = filtros.temas.filter(t => meta.temas.includes(t));
         filtros.personajes = filtros.personajes.filter(p => meta.personajes.includes(p));
         filtros.partidos = filtros.partidos.filter(p => meta.partidos.includes(p));
+        filtros.organismos = filtros.organismos.filter(o => meta.organismos.includes(o));
         filtros.ambitos = filtros.ambitos.filter(a => meta.ambitos.includes(a));
         // Antes "ninguno" quería decir "sin filtro"; ahora se arranca solo con las nacionales.
         if (!filtros.ambitos.length) filtros.ambitos = ["Nacionales"];

@@ -1,15 +1,16 @@
 import re
 
 from clusterer import agrupar
-from config.fuentes import TITULAR_EEUU
+from config.organismos import ORGANISMOS
 from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
+from config.regiones import REGIONES, SV_ES
 from config.temas import TEMAS
 from scorer import estrellas, puntuar
 from texto import normalizar
 
 _ORDEN_TEMAS = list(TEMAS)
-_ORDEN_PERSONAJES = list(PERSONAJES) + list(PARTIDOS)
+_ORDEN_PERSONAJES = list(PERSONAJES) + list(PARTIDOS) + list(ORGANISMOS)
 
 
 def _union_ordenada(listas, orden: list) -> list:
@@ -56,29 +57,40 @@ def construir_noticias(articulos: list) -> list:
 
 
 AMBITOS = ["Nacionales", "Internacionales"]
-_EEUU = [re.compile(rf"\b(?:{'|'.join(re.escape(normalizar(p)) for p in grupo)})\b") for grupo in TITULAR_EEUU]
+def _patron(palabras: list) -> re.Pattern:
+    return re.compile(rf"\b(?:{'|'.join(re.escape(normalizar(p)) for p in palabras)})\b")
 
 
-def trata_de_eeuu(noticia: dict) -> bool:
-    """El titular nombra a EE. UU. y también a El Salvador o la región (aranceles, TPS, deportaciones…)."""
+_SV = _patron(SV_ES)
+_REGIONES = {codigo: _patron(r["es"]) for codigo, r in REGIONES.items()}
+
+
+def regiones_de(noticia: dict) -> set:
+    """Regiones (Estados Unidos, Europa…) que el titular nombra junto con El Salvador o Centroamérica."""
     titulo = normalizar(noticia["titulo"])
-    return all(p.search(titulo) for p in _EEUU)
+    if not _SV.search(titulo):
+        return set()
+    return {codigo for codigo, p in _REGIONES.items() if p.search(titulo)}
 
 
 def _pais_marcado(noticia: dict, paises: set) -> bool:
-    # "Estados Unidos" reúne las notas de su relación con la región, sea cual sea el medio que las publicó.
-    return noticia["pais"] in paises or ("US" in paises and trata_de_eeuu(noticia))
+    # Cada región reúne las notas de su relación con El Salvador, sea cual sea el medio que las publicó.
+    return noticia["pais"] in paises or bool(paises & regiones_de(noticia))
 
 
 def ambitos_de(noticia: dict) -> set:
-    """Nacionales = de El Salvador; Internacionales = de cualquier otro país (aunque mencione a El Salvador)."""
-    return {"Nacionales"} if noticia["pais"] == "SV" else {"Internacionales"}
+    """Nacionales = de El Salvador; Internacionales = de cualquier otro país (aunque mencione a El Salvador)
+    y las de El Salvador sobre su relación con otra región del mundo."""
+    if noticia["pais"] != "SV":
+        return {"Internacionales"}
+    return {"Nacionales", "Internacionales"} if regiones_de(noticia) else {"Nacionales"}
 
 
 def filtrar(noticias: list, paises: set, temas: set, personajes: set, partidos: set = frozenset(),
-            ambitos: set = frozenset()) -> list:
+            ambitos: set = frozenset(), organismos: set = frozenset()) -> list:
     """País marcado Y algún tema marcado Y (si hay personajes marcados) algún personaje marcado
-    Y (si hay partidos marcados) algún partido marcado Y (si hay ámbitos marcados) algún ámbito marcado."""
+    Y (si hay partidos marcados) algún partido marcado Y (si hay ámbitos marcados) algún ámbito marcado
+    Y (si hay organismos marcados) algún organismo marcado."""
     return [
         n for n in noticias
         if _pais_marcado(n, paises)
@@ -86,6 +98,7 @@ def filtrar(noticias: list, paises: set, temas: set, personajes: set, partidos: 
         and (not personajes or personajes.intersection(n["personajes"]))
         and (not partidos or partidos.intersection(n["personajes"]))
         and (not ambitos or ambitos.intersection(ambitos_de(n)))
+        and (not organismos or organismos.intersection(n["personajes"]))
     ]
 
 

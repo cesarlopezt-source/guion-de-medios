@@ -72,7 +72,7 @@ def test_news_mes_invalido_400(client):
 
 def test_meta_listas(client):
     m = client.get("/api/meta").get_json()
-    assert [p["codigo"] for p in m["paises"]] == ["SV", "GT", "HN", "NI", "CR", "PA", "US", "REG"]
+    assert [p["codigo"] for p in m["paises"]] == ["SV", "GT", "HN", "NI", "CR", "PA", "REG", "US", "CAN", "MX", "CAR", "SUD", "UE", "EUR", "ASI", "MO"]
     assert m["temas"][0] == "Economía" and m["temas"][-1] == "Otras"
     assert "Nayib Bukele" in m["personajes"] and "FMLN" not in m["personajes"]
     assert m["partidos"][:3] == ["Nuevas Ideas", "ARENA", "FMLN"]

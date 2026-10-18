@@ -16,6 +16,8 @@ from config.paises import PAISES
 PAIS_HEX = {
     "SV": "D6E4F5", "GT": "D9F0E3", "HN": "FCE8D5", "NI": "EADCF2",
     "CR": "FFF3C4", "PA": "FAD9D9", "US": "DCDCF0", "REG": "E5E8EB",
+    "CAN": "F5D5D0", "MX": "D4EDDA", "CAR": "D1F2EB", "SUD": "FDEBD0", "UE": "D6DBF5", "EUR": "E8DAEF",
+    "ASI": "F6DDCC", "MO": "F0E6D2",
 }
 _MARCA = re.compile(r"^\s*\[([^\]]+)\]\s*$")
 _ENLACE = re.compile(r"^-\s*(.+?):\s*(https?://\S+)\s*$")  # "- Medio: https://..." en el mini brief

@@ -1,3 +1,6 @@
+from config.regiones import REGIONES
+
+# Orden de cercano a lejano: Centroamérica, Regional y luego el resto del mundo (config/regiones.py).
 PAISES = {
     "SV": "El Salvador",
     "GT": "Guatemala",
@@ -5,8 +8,8 @@ PAISES = {
     "NI": "Nicaragua",
     "CR": "Costa Rica",
     "PA": "Panamá",
-    "US": "Estados Unidos",  # solo noticias de su relación con El Salvador y la región (config/fuentes.py)
     "REG": "Regional",
+    **{codigo: r["nombre"] for codigo, r in REGIONES.items()},
 }
 
 # Para asignar país a las noticias de medios regionales.

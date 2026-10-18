@@ -69,3 +69,10 @@ def _sin_google(monkeypatch):
     """Las pruebas nunca piden a Google el enlace real; las que lo necesitan reemplazan esta función."""
     from collectors import google_enlaces
     monkeypatch.setattr(google_enlaces, "enlace_real", lambda url, sesion=None: None)
+
+
+@pytest.fixture(autouse=True)
+def _sin_traductor(monkeypatch):
+    """Las pruebas nunca llaman a Gemini para traducir; las que lo necesitan reemplazan esta función."""
+    import traductor
+    monkeypatch.setattr(traductor, "traducir", lambda articulos, client=None: None)

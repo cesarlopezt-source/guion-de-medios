@@ -283,3 +283,17 @@ def test_nube_no_busca_enlaces_reales(monkeypatch, rutas):
                         lambda f: ([art("https://news.google.com/rss/articles/g1", via="google_news")], None))
     watcher.correr([F2], ahora=AHORA, origen="nube", verificar_enlaces=False, **rutas)
     assert llamadas == []
+
+
+def test_traduce_solo_titulares_nuevos_de_busquedas_en_otro_idioma(monkeypatch, rutas):
+    import traductor
+    traducidos = []
+    monkeypatch.setattr(traductor, "traducir", lambda arts, client=None: traducidos.extend(a["url"] for a in arts))
+    en = {**F2, "url": "c", "idioma": "en"}
+    resultados = {"a": ([art("u1")], None), "c": ([art("u2", "El Salvador signs deal", "google_news")], None)}
+    monkeypatch.setattr(watcher, "recolectar", lambda f: resultados[f["url"]])
+    watcher.correr([F1, en], ahora=AHORA, **rutas)
+    assert traducidos == ["u2"]
+    traducidos.clear()
+    watcher.correr([F1, en], ahora=AHORA, **rutas)  # ya guardado: no se vuelve a traducir
+    assert traducidos == []

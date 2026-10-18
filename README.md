@@ -10,7 +10,9 @@ Abrir: acceso directo **Guion de Medios** en el escritorio, o <http://127.0.0.1:
 - **Portal** (`serve.py`): la tarea `GuionMedios-Portal` lo inicia 2 minutos después de iniciar sesión en Windows. Solo lee la base, así que los filtros responden al instante.
 - **Estado de fuentes**: enlace en el encabezado del portal; muestra qué medio respondió en la última corrida.
 - **Enlaces reales**: Google News entrega un enlace intermedio que no abre desde un PDF (error 405). La PC lo cambia por el enlace del medio (`collectors/google_enlaces.py`): hasta 200 nuevos y 100 atrasados por corrida, con 3 s entre pedidos. Si Google bloquea (429 o su página "sorry") se pausa 3 horas; la recolección normal de Google News no se ve afectada. Para convertir de una vez los ya guardados: `python scripts/convertir_enlaces.py`.
-- **Estados Unidos y organismos (FMI, BID, Banco Mundial, ONU)**: búsquedas en Google News en `config/fuentes.py` (`BUSQUEDAS_EEUU`, `ORGANISMOS`). Solo entran notas cuyo titular nombra a EE. UU. junto con El Salvador o la región, o al organismo junto con un país centroamericano o América Latina.
+- **Resto del mundo** (Estados Unidos, Canadá, México, Caribe, Sudamérica, Unión Europea, Europa, Asia, Medio Oriente): `config/regiones.py`. Solo entran notas cuyo titular nombra la región Y a El Salvador o Centroamérica. Además de las búsquedas en español hay búsquedas en inglés y portugués; esos titulares se traducen al español con Gemini (`traductor.py`).
+- **Organismos** (FMI, BID, Banco Mundial, ONU, BCIE, OEA, CEPAL, SICA, Unión Europea): `config/organismos.py`. Tienen menú propio en el portal (sin marcar = sin filtro) y búsquedas propias.
+- **Ámbito**: Nacionales = noticias de El Salvador (predeterminado); Internacionales = de otros países y las de El Salvador sobre su relación con otra región.
 - **Mini brief**: botón aparte del guion. Por noticia (qué pasó y por qué importa), análisis general o ambos; se descarga en PDF o Word con los links.
 - **Exportar**: "Informe completo" o "Solo temas y links" (titular y links de cada noticia) en Word, Excel o PDF.
 

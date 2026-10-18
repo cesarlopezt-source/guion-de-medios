@@ -11,6 +11,7 @@ from pathlib import Path
 import ajustes
 import link_checker
 import store
+import traductor
 from classifier import clasificar
 from collectors import google_enlaces, recolectar
 from config.fuentes import FUENTES, consultas_google_news
@@ -110,13 +111,19 @@ def _recolectar_y_guardar(fuentes, db_path, ahora, origen, verificar_enlaces, si
     with ThreadPoolExecutor(max_workers=MAX_PARALELO) as ex:
         resultados = list(ex.map(recolectar, fuentes))
 
-    articulos, fuentes_ok, fuentes_error = [], 0, 0
+    articulos, por_traducir, fuentes_ok, fuentes_error = [], [], 0, 0
     for fuente, (encontrados, error) in zip(fuentes, resultados):
         ok = error is None and bool(encontrados)
         fuentes_ok += ok
         fuentes_error += not ok
         store.registrar_estado_fuente(fuente, ok, len(encontrados), error, db_path)
         articulos.extend(encontrados)
+        if fuente.get("idioma", "es") != "es":
+            por_traducir.extend(encontrados)
+
+    # Titulares en inglés o portugués → español (solo los que todavía no están guardados).
+    ya_guardadas = store.urls_existentes([a["url"] for a in por_traducir], db_path)
+    traductor.traducir([a for a in por_traducir if a["url"] not in ya_guardadas])
 
     # INSERT OR IGNORE conserva el primero: así gana la versión del RSS directo.
     articulos.sort(key=lambda a: PRIORIDAD_VIA[a["via"]])

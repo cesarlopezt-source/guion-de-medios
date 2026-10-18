@@ -1,5 +1,6 @@
 import re
 
+from config.organismos import ORGANISMOS
 from config.paises import EL_SALVADOR_KEYWORDS, PAIS_KEYWORDS
 from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
@@ -29,6 +30,7 @@ def _patron_partido(p: dict):
 
 
 _PARTIDOS = {nombre: _patron_partido(p) for nombre, p in PARTIDOS.items()}
+_ORGANISMOS = {nombre: _patron_partido(o) for nombre, o in ORGANISMOS.items()}
 _PAISES = {pais: _patron(pal) for pais, pal in PAIS_KEYWORDS.items()}
 _SV = _patron(EL_SALVADOR_KEYWORDS)
 
@@ -50,8 +52,9 @@ def clasificar(articulo: dict) -> dict:
         resultado["pais"] = _pais_regional(texto)
     temas = [tema for tema, p in _TEMAS.items() if p.search(texto)]
     resultado["temas"] = temas or ["Otras"]
-    # Los partidos van en la misma lista que los personajes (después de ellos); el portal los separa.
+    # Partidos y organismos van en la misma lista que los personajes (después de ellos); el portal los separa.
     resultado["personajes"] = ([n for n, p in _PERSONAJES.items() if p.search(texto)]
-                               + [n for n, buscar in _PARTIDOS.items() if buscar(original, texto)])
+                               + [n for n, buscar in _PARTIDOS.items() if buscar(original, texto)]
+                               + [n for n, buscar in _ORGANISMOS.items() if buscar(original, texto)])
     resultado["menciona_sv"] = resultado.get("pais") != "SV" and bool(_SV.search(texto))
     return resultado

@@ -16,6 +16,7 @@ import guionista
 import store
 import valorador
 import watcher
+from config.organismos import ORGANISMOS
 from config.paises import PAISES
 from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
@@ -181,6 +182,7 @@ def api_meta():
         "temas": TEMAS_UI,
         "personajes": list(PERSONAJES),
         "partidos": list(PARTIDOS),
+        "organismos": list(ORGANISMOS),
         "ambitos": AMBITOS,
         "ultima_actualizacion": ultima["fin"] if ultima else None,
         "meses": [list(m) for m in store.meses_disponibles()],
@@ -206,7 +208,7 @@ def api_news():
         return jsonify({"error": "Mes inválido"}), 400
 
     noticias = filtrar(store.obtener_noticias(mes, anio), _csv("paises"), _csv("temas"), _csv("personajes"),
-                       _csv("partidos"), _csv("ambitos"))
+                       _csv("partidos"), _csv("ambitos"), _csv("organismos"))
     noticias = ordenar(noticias, request.args.get("orden", "importancia"))
 
     if (mes, anio) != (ahora.month, ahora.year):
