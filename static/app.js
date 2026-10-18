@@ -423,8 +423,9 @@ function exportar(formato) {
 function abrirModal(id) { document.getElementById(id).hidden = false; }
 function cerrarModal(id) { document.getElementById(id).hidden = true; }
 
+// Solo lo que se lee a cámara: sin marcas ni las notas de apoyo del final.
 function contarPalabras(texto) {
-    return texto.split("\n").filter(l => !/^\s*\[[^\]]+\]\s*$/.test(l))
+    return texto.split("[NOTAS DE APOYO]")[0].split("\n").filter(l => !/^\s*\[[^\]]+\]\s*$/.test(l))
         .reduce((total, l) => total + l.split(/\s+/).filter(Boolean).length, 0);
 }
 

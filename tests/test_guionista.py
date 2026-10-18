@@ -57,3 +57,22 @@ def test_sin_clave_lanza_config_error(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     with pytest.raises(ia.ConfigError):
         guionista.generar_guion([N1], instrucciones="x")
+
+
+def test_notas_de_apoyo_no_cuentan_como_palabras_habladas():
+    texto = "[APERTURA]\nHola a todos\n[CIERRE]\nAdiós\n[NOTAS DE APOYO]\nDato: remesas, LPG, 14/10/2026"
+    assert guionista.contar_palabras(texto) == 4
+
+
+def test_prompt_pide_analisis_fechas_y_notas():
+    c = ClienteFalso(GUION_OK)
+    guionista.generar_guion([N1], instrucciones="x", client=c)
+    p = c.prompts[0]
+    assert "[NOTAS DE APOYO]" in p and "Fecha: 14/10/2026" in p and "Gobierno de El Salvador" in p
+
+
+def test_guion_largo_se_acorta():
+    largo = "[APERTURA]\n" + "palabra " * 900 + "\n[CIERRE]\nAdiós"
+    c = ClienteFalso(largo, GUION_OK)
+    r = guionista.generar_guion([N1], instrucciones="x", client=c)
+    assert r["texto"] == GUION_OK and "Acórtalo" in c.prompts[1]
