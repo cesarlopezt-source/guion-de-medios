@@ -72,7 +72,7 @@ def test_news_mes_invalido_400(client):
 
 def test_meta_listas(client):
     m = client.get("/api/meta").get_json()
-    assert [p["codigo"] for p in m["paises"]] == ["SV", "GT", "HN", "NI", "CR", "PA", "REG"]
+    assert [p["codigo"] for p in m["paises"]] == ["SV", "GT", "HN", "NI", "CR", "PA", "US", "REG"]
     assert m["temas"][0] == "Economía" and m["temas"][-1] == "Otras"
     assert "Nayib Bukele" in m["personajes"] and "FMLN" not in m["personajes"]
     assert m["partidos"][:3] == ["Nuevas Ideas", "ARENA", "FMLN"]
@@ -167,3 +167,28 @@ def test_guion_con_gemini_saturado_responde_503(client, monkeypatch):
     monkeypatch.setattr(guionista, "generar_guion", saturado)
     r = client.post("/api/guion", json={"noticias": [{"titulo": "x"}]})
     assert r.status_code == 503 and "saturado" in r.get_json()["error"]
+
+
+def test_news_ambito(client):
+    nac = titulos(client.get("/api/news?paises=SV,GT&temas=Economía&ambitos=Nacionales"))
+    intl = titulos(client.get("/api/news?paises=SV,GT&temas=Economía&ambitos=Internacionales"))
+    assert "gt-eco" not in nac and "sv-eco" in nac and intl == ["gt-eco"]
+    assert client.get("/api/meta").get_json()["ambitos"] == ["Nacionales", "Internacionales"]
+
+
+def test_export_temas_y_links(client):
+    r = client.post("/api/export", json={"items": [N1], "format": "word", "modo": "links"})
+    assert r.status_code == 200 and "temas_y_links.docx" in r.headers["Content-Disposition"]
+
+
+def test_brief(client, monkeypatch):
+    import brief
+    monkeypatch.setattr(brief, "generar_brief", lambda noticias, modo: {"texto": f"{modo}:{len(noticias)}"})
+    assert client.post("/api/brief", json={"noticias": [N1, N2], "modo": "brief"}).get_json() == {"texto": "brief:2"}
+    r = client.post("/api/brief/export", json={"texto": "[1 · El Salvador]\nT\n- M: https://m/1", "formato": "pdf"})
+    assert r.data[:4] == b"%PDF" and "mini_brief.pdf" in r.headers["Content-Disposition"]
+
+
+def test_brief_sin_clave_503(client, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert client.post("/api/brief", json={"noticias": [N1], "modo": "ambos"}).status_code == 503

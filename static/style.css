@@ -5,6 +5,7 @@
     --pais-NI:  #0067C6;
     --pais-CR:  #CE1126;
     --pais-PA:  #DA121A;
+    --pais-US:  #3C3B6E;
     --pais-REG: #7F8C8D;
     --oscuro:   #2C3E50;
     --gris:     #7F8C8D;
@@ -88,6 +89,7 @@ header h1 span { font-weight: 400; opacity: 0.75; }
 .news-card[data-pais="NI"]  { border-left-color: var(--pais-NI); }
 .news-card[data-pais="CR"]  { border-left-color: var(--pais-CR); }
 .news-card[data-pais="PA"]  { border-left-color: var(--pais-PA); }
+.news-card[data-pais="US"]  { border-left-color: var(--pais-US); }
 .news-card[data-pais="REG"] { border-left-color: var(--pais-REG); }
 
 .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; }
@@ -96,7 +98,7 @@ header h1 span { font-weight: 400; opacity: 0.75; }
 .pais-badge.SV { background: var(--pais-SV); }  .pais-badge.GT { background: var(--pais-GT); }
 .pais-badge.HN { background: var(--pais-HN); }  .pais-badge.NI { background: var(--pais-NI); }
 .pais-badge.CR { background: var(--pais-CR); }  .pais-badge.PA { background: var(--pais-PA); }
-.pais-badge.REG { background: var(--pais-REG); }
+.pais-badge.US { background: var(--pais-US); }  .pais-badge.REG { background: var(--pais-REG); }
 .tema-badge { padding: 0.12rem 0.5rem; border-radius: 12px; font-size: 0.72rem; background: #ECF0F1; color: #34495E; }
 .sv-badge { padding: 0.12rem 0.5rem; border-radius: 12px; font-size: 0.72rem; background: #FDEBD0; color: #A04000; font-weight: 600; }
 .card-meta { color: var(--gris); font-size: 0.8rem; }

@@ -1,3 +1,5 @@
+import re
+
 import feedparser
 
 from collectors._comun import articulo, fecha_de_entrada
@@ -5,8 +7,15 @@ from config.fuentes import fuente_por_dominio
 from texto import limpiar_html, normalizar
 
 
+def _patrones_titular(grupos: list) -> list:
+    """`titular` de la fuente: grupos de palabras; el titular debe contener alguna palabra de CADA grupo
+    (sin tildes, palabra completa)."""
+    return [re.compile(rf"\b(?:{'|'.join(re.escape(normalizar(p)) for p in grupo)})\b") for grupo in grupos or []]
+
+
 def parsear(contenido: bytes, fuente: dict) -> list:
     feed = feedparser.parse(contenido)
+    titular = _patrones_titular(fuente.get("titular"))
     resultado = []
     for e in feed.entries:
         titulo = limpiar_html(e.get("title", ""))
@@ -23,6 +32,8 @@ def parsear(contenido: bytes, fuente: dict) -> list:
                 titulo = titulo[: -len(nombre) - 3].strip()
         # Google a veces publica la portada del medio como "Medio - Medio": no es una noticia.
         if not titulo or not url or normalizar(titulo) in {normalizar(nombre_google), normalizar(medio)}:
+            continue
+        if not all(p.search(normalizar(titulo)) for p in titular):
             continue
         # La descripción de Google News solo repite el titular y el medio.
         resultado.append(articulo(titulo, "", url, medio, pais, fecha_de_entrada(e), "google_news"))

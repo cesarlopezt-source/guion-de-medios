@@ -12,7 +12,7 @@ import ajustes
 import link_checker
 import store
 from classifier import clasificar
-from collectors import recolectar
+from collectors import google_enlaces, recolectar
 from config.fuentes import FUENTES, consultas_google_news
 from noticias import construir_noticias
 
@@ -21,6 +21,9 @@ log = logging.getLogger("watcher")
 MAX_PARALELO = 8
 ENLACES_POR_CORRIDA = 300  # verificación de noticias archivadas, por tandas
 PRIORIDAD_VIA = {"rss": 0, "web": 1, "google_news": 2}
+# Enlaces de Google News → enlace real del medio (2 consultas a Google por enlace).
+ENLACES_NUEVOS_POR_CORRIDA = 600
+ENLACES_ATRASADOS_POR_CORRIDA = 300
 
 
 def _edad_min(lock_path: Path) -> float:
@@ -117,6 +120,8 @@ def _recolectar_y_guardar(fuentes, db_path, ahora, origen, verificar_enlaces, si
 
     # INSERT OR IGNORE conserva el primero: así gana la versión del RSS directo.
     articulos.sort(key=lambda a: PRIORIDAD_VIA[a["via"]])
+    if verificar_enlaces:  # solo en la PC; la nube recibe las noticias con el enlace real al sincronizar
+        _poner_enlaces_reales(articulos, db_path)
     nuevos = store.guardar_articulos([clasificar(a) for a in articulos], db_path, origen=origen)
 
     meses = meses_a_reconstruir(ahora)
@@ -132,6 +137,29 @@ def _recolectar_y_guardar(fuentes, db_path, ahora, origen, verificar_enlaces, si
         sincronizar.despues(meses)
     log.info("Corrida OK (%s): %d nuevos, %d fuentes OK, %d con error", origen, nuevos, fuentes_ok, fuentes_error)
     return {"ok": True, "nuevos": nuevos, "fuentes_ok": fuentes_ok, "fuentes_error": fuentes_error}
+
+
+def resolver_enlaces(urls: list, max_paralelo: int = 4) -> dict:
+    """url de Google News → enlace real del medio ('' si Google no lo tiene).
+    Las que fallaron por ahora (Google en pausa por 429, red) no aparecen: se reintentan en otra corrida."""
+    with ThreadPoolExecutor(max_workers=max_paralelo) as ex:
+        return {u: e for u, e in zip(urls, ex.map(google_enlaces.enlace_real, urls)) if e is not None}
+
+
+def _poner_enlaces_reales(articulos: list, db_path) -> None:
+    """A los artículos nuevos de Google News les pone el enlace real y, si queda margen, a una tanda
+    de los ya guardados que todavía no lo tienen."""
+    de_google = [a for a in articulos if google_enlaces.es_de_google(a["url"])]
+    ya_guardadas = store.urls_existentes([a["url"] for a in de_google], db_path)
+    nuevas = list(dict.fromkeys(a["url"] for a in de_google if a["url"] not in ya_guardadas))[:ENLACES_NUEVOS_POR_CORRIDA]
+    enlaces = resolver_enlaces(nuevas)
+    for a in de_google:
+        if a["url"] in enlaces:
+            a["enlace"] = enlaces[a["url"]]
+    if not google_enlaces.en_pausa():
+        pendientes = store.urls_sin_enlace(ENLACES_ATRASADOS_POR_CORRIDA, db_path)
+        store.poner_enlaces(resolver_enlaces(pendientes), db_path)
+    log.info("Enlaces reales: %d nuevos de Google News", sum(1 for e in enlaces.values() if e))
 
 
 def _configurar_log() -> None:

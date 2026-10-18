@@ -1,12 +1,15 @@
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const MAX_GUION = 12;
+const MAX_BRIEF = 40;
 const CLAVE_FILTROS = "gm_filtros";
 const FILTROS_INICIALES = {
     paises: ["SV"],
-    temas: ["Economía", "Inversión", "Política", "Coyuntura", "Social"],
+    temas: ["Economía", "Inversión", "Finanzas", "Negocios", "Activos Digitales", "Política", "Coyuntura", "Social"],
     personajes: [],
     partidos: [],
+    ambitos: [],
+    temasConocidos: null,  // temas que existían la última vez; los nuevos se marcan solos
     orden: "importancia",
 };
 
@@ -61,9 +64,11 @@ const MENUS = [
     { grupo: "temas", titulo: "Temas" },
     { grupo: "personajes", titulo: "Personajes" },
     { grupo: "partidos", titulo: "Partidos" },
+    { grupo: "ambitos", titulo: "Ámbito" },
 ];
-// En estos menús "Todos" = no filtrar; las casillas individuales eligen a quién buscar.
-const VACIO_ES_TODOS = ["personajes", "partidos"];
+// En estos menús no marcar nada = "Sin filtro" (salen todas las noticias); las casillas eligen a quién buscar.
+const VACIO_ES_TODOS = ["personajes", "partidos", "ambitos"];
+const textoTodos = grupo => VACIO_ES_TODOS.includes(grupo) ? "Sin filtro" : "Todos";
 
 function opcionesDe(grupo) {
     if (grupo === "paises") return meta.paises.map(p => ({ valor: p.codigo, texto: p.nombre }));
@@ -78,7 +83,7 @@ function construirMenus() {
     <span class="dd-titulo">${titulo}:</span> <span class="dd-resumen"></span> <span class="dd-flecha">▾</span>
   </button>
   <div class="dd-panel" hidden>
-    <label class="dd-opcion dd-todos"><input type="checkbox" data-todos="1"> Todos</label>
+    <label class="dd-opcion dd-todos"><input type="checkbox" data-todos="1"> ${textoTodos(grupo)}</label>
     ${opcionesDe(grupo).map(o => `
     <label class="dd-opcion"><input type="checkbox" value="${escapeHtml(o.valor)}"> ${escapeHtml(o.texto)}</label>`).join("")}
   </div>
@@ -125,7 +130,7 @@ function pintarMenus() {
         dd.querySelectorAll("input").forEach(chk => {
             chk.checked = chk.dataset.todos ? todosMarcado : marcados.includes(chk.value);
         });
-        dd.querySelector(".dd-resumen").textContent = resumen(grupo);
+        dd.querySelector(".dd-resumen").textContent = todos ? textoTodos(grupo) : resumen(grupo);
         dd.classList.toggle("filtrando", !todos);
     });
 }
@@ -247,7 +252,8 @@ async function cargarNoticias() {
     const params = new URLSearchParams({
         paises: filtros.paises.join(","), temas: filtros.temas.join(","),
         personajes: (resumen("personajes") === "Todos" ? [] : filtros.personajes).join(","),
-        partidos: (resumen("partidos") === "Todos" ? [] : filtros.partidos).join(","), orden: filtros.orden,
+        partidos: (resumen("partidos") === "Todos" ? [] : filtros.partidos).join(","),
+        ambitos: (resumen("ambitos") === "Todos" ? [] : filtros.ambitos).join(","), orden: filtros.orden,
     });
     const [anio, mes] = periodo ? [periodo.anio, periodo.mes] : meta.mes_actual;
     params.set("mes", mes);
@@ -326,6 +332,12 @@ function seleccionarVisibles() {
     pintarNoticias();
 }
 
+function quitarSeleccion() {
+    seleccion.clear();
+    actualizarContador();
+    pintarNoticias();
+}
+
 function editarValoracion(textarea) {
     valoraciones.set(textarea.dataset.k, textarea.value);
 }
@@ -338,6 +350,9 @@ function actualizarContador() {
     const btnGuion = document.getElementById("btn-guion");
     btnGuion.disabled = n === 0 || n > MAX_GUION;
     btnGuion.title = n > MAX_GUION ? `Máximo ${MAX_GUION} noticias` : "";
+    const btnBrief = document.getElementById("btn-brief");
+    btnBrief.disabled = n === 0 || n > MAX_BRIEF;
+    btnBrief.title = n > MAX_BRIEF ? `Máximo ${MAX_BRIEF} noticias` : "";
 }
 
 function seleccionadasConValoracion() {
@@ -393,7 +408,9 @@ async function descargar(url, cuerpo, nombre) {
 function exportar(formato) {
     if (!seleccion.size) { alert("Selecciona al menos una noticia."); return; }
     const ext = { word: "docx", excel: "xlsx", pdf: "pdf" }[formato];
-    descargar("/api/export", { items: seleccionadasConValoracion(), format: formato }, `noticias_centroamerica.${ext}`);
+    const modo = document.getElementById("select-contenido").value;
+    const nombre = modo === "links" ? "temas_y_links" : "noticias_centroamerica";
+    descargar("/api/export", { items: seleccionadasConValoracion(), format: formato, modo }, `${nombre}.${ext}`);
 }
 
 /* ---------- Guion de medios ---------- */
@@ -473,8 +490,57 @@ async function abrirGuion(id) {
     mostrarGuion(g.texto, `Guion del ${new Date(g.creado).toLocaleString("es-SV")}.`);
 }
 
+/* ---------- Mini brief ---------- */
+
+function abrirBrief() {
+    const n = seleccion.size;
+    document.getElementById("brief-estado").textContent =
+        `${n} noticia${n === 1 ? "" : "s"} seleccionada${n === 1 ? "" : "s"}. Elige el contenido y pulsa Generar.`;
+    abrirModal("modal-brief");
+}
+
+async function generarBrief() {
+    const items = [...seleccion.values()];
+    if (!items.length || items.length > MAX_BRIEF) return;
+    const modo = document.getElementById("select-brief-modo").value;
+    const estado = document.getElementById("brief-estado");
+    const btn = document.getElementById("btn-brief-generar");
+    btn.disabled = true;
+    estado.textContent = `Escribiendo con ${items.length} noticia${items.length > 1 ? "s" : ""}…`;
+    try {
+        const resp = await api("/api/brief", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noticias: items, modo }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || resp.status);
+        document.getElementById("brief-texto").value = data.texto;
+        estado.textContent = "Puedes editar el texto antes de copiarlo o descargarlo.";
+    } catch (err) {
+        estado.textContent = `No se pudo generar: ${err.message}`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function copiarBrief() {
+    const texto = document.getElementById("brief-texto").value;
+    try {
+        await navigator.clipboard.writeText(texto);
+        document.getElementById("brief-estado").textContent = "Copiado al portapapeles.";
+    } catch (e) {
+        document.getElementById("brief-texto").select();
+        document.execCommand("copy");
+    }
+}
+
+function descargarBrief(formato) {
+    const texto = document.getElementById("brief-texto").value;
+    if (!texto.trim()) { alert("Primero genera el mini brief."); return; }
+    descargar("/api/brief/export", { texto, formato }, `mini_brief.${formato === "word" ? "docx" : "pdf"}`);
+}
+
 document.addEventListener("keydown", e => {
-    if (e.key === "Escape") { cerrarModal("modal-guion"); cerrarModal("modal-historial"); }
+    if (e.key === "Escape") { cerrarModal("modal-guion"); cerrarModal("modal-historial"); cerrarModal("modal-brief"); }
 });
 
 /* ---------- Inicio ---------- */
@@ -488,6 +554,14 @@ document.addEventListener("keydown", e => {
         filtros.temas = filtros.temas.filter(t => meta.temas.includes(t));
         filtros.personajes = filtros.personajes.filter(p => meta.personajes.includes(p));
         filtros.partidos = filtros.partidos.filter(p => meta.partidos.includes(p));
+        filtros.ambitos = filtros.ambitos.filter(a => meta.ambitos.includes(a));
+        // Temas agregados después de la última visita: se marcan para que se vean.
+        // (Sin registro previo, los nuevos son los de octubre de 2026.)
+        const conocidos = filtros.temasConocidos
+            || meta.temas.filter(t => !["Finanzas", "Negocios", "Activos Digitales"].includes(t));
+        meta.temas.filter(t => !conocidos.includes(t) && !filtros.temas.includes(t)).forEach(t => filtros.temas.push(t));
+        filtros.temasConocidos = [...meta.temas];
+        guardarFiltros();
         pintarMenus();
         document.getElementById("select-orden").value = filtros.orden;
         actualizarContador();

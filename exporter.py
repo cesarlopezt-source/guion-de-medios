@@ -15,9 +15,11 @@ from config.paises import PAISES
 
 PAIS_HEX = {
     "SV": "D6E4F5", "GT": "D9F0E3", "HN": "FCE8D5", "NI": "EADCF2",
-    "CR": "FFF3C4", "PA": "FAD9D9", "REG": "E5E8EB",
+    "CR": "FFF3C4", "PA": "FAD9D9", "US": "DCDCF0", "REG": "E5E8EB",
 }
 _MARCA = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+_ENLACE = re.compile(r"^-\s*(.+?):\s*(https?://\S+)\s*$")  # "- Medio: https://..." en el mini brief
+NOMBRE = "MIXCOM News Monitor"
 
 
 def _estrellas(n: int) -> str:
@@ -36,6 +38,11 @@ def _por_pais(items: list) -> list:
     return [(PAISES[p], grupos[p]) for p in PAISES if p in grupos]
 
 
+def _link(url: str, texto: str = None) -> str:
+    """Enlace clickeable para un Paragraph de reportlab."""
+    return f'<a href="{html.escape(url, quote=True)}" color="blue">{html.escape(texto or url)}</a>'
+
+
 def _bytes(guardar) -> bytes:
     buf = BytesIO()
     guardar(buf)
@@ -44,7 +51,7 @@ def _bytes(guardar) -> bytes:
 
 def export_word(items: list) -> bytes:
     doc = Document()
-    doc.add_heading("Informe de noticias · Centroamérica", level=0)
+    doc.add_heading(f"{NOMBRE} · Informe de noticias", level=0)
     doc.add_paragraph(f"Generado: {_fecha()}")
     for pais, noticias in _por_pais(items):
         doc.add_heading(pais, level=1)
@@ -94,7 +101,7 @@ def _pdf(construir) -> bytes:
 def export_pdf(items: list) -> bytes:
     def construir(st):
         e = html.escape
-        story = [Paragraph("Informe de noticias · Centroamérica", st["Title"]),
+        story = [Paragraph(f"{NOMBRE} · Informe de noticias", st["Title"]),
                  Paragraph(f"Generado: {_fecha()}", st["Normal"]), Spacer(1, 0.5 * cm)]
         for pais, noticias in _por_pais(items):
             story.append(Paragraph(e(pais), st["Heading1"]))
@@ -107,7 +114,7 @@ def export_pdf(items: list) -> bytes:
                 story.append(Paragraph(f"<b>Medios:</b> {item['n_fuentes']}  |  {e(item['publicado'][:16])}",
                                        st["Normal"]))
                 for f in item["fuentes"]:
-                    story.append(Paragraph(f"• {e(f['nombre'])}: {e(f['url'])}", st["Normal"]))
+                    story.append(Paragraph(f"• {e(f['nombre'])}: {_link(f['url'])}", st["Normal"]))
                 story.append(Spacer(1, 0.4 * cm))
         return story
     return _pdf(construir)
@@ -139,5 +146,90 @@ def export_guion_pdf(texto: str) -> bytes:
             elif linea.strip():
                 story.append(Paragraph(html.escape(linea.strip()), st["Normal"]))
                 story.append(Spacer(1, 0.2 * cm))
+        return story
+    return _pdf(construir)
+
+
+# ---------- Solo temas y links ----------
+
+def export_links_word(items: list) -> bytes:
+    doc = Document()
+    doc.add_heading(f"{NOMBRE} · Temas y links", level=0)
+    doc.add_paragraph(f"Generado: {_fecha()}")
+    for item in items:
+        doc.add_heading(item["titulo"], level=2)
+        for f in item["fuentes"]:
+            doc.add_paragraph(f"{f['nombre']}: {f['url']}", style="List Bullet")
+    return _bytes(doc.save)
+
+
+def export_links_excel(items: list) -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Temas y links"
+    ws.append(["Tema", "Medio", "Link"])
+    for celda in ws[1]:
+        celda.font = Font(bold=True, color="FFFFFF")
+        celda.fill = PatternFill("solid", fgColor="2C3E50")
+    for item in items:
+        for i, f in enumerate(item["fuentes"]):
+            ws.append([item["titulo"] if i == 0 else "", f["nombre"], f["url"]])
+            ws.cell(ws.max_row, 3).hyperlink = f["url"]
+    for col, ancho in {"A": 70, "B": 25, "C": 90}.items():
+        ws.column_dimensions[col].width = ancho
+    return _bytes(wb.save)
+
+
+def export_links_pdf(items: list) -> bytes:
+    def construir(st):
+        e = html.escape
+        story = [Paragraph(f"{NOMBRE} · Temas y links", st["Title"]),
+                 Paragraph(f"Generado: {_fecha()}", st["Normal"]), Spacer(1, 0.5 * cm)]
+        for item in items:
+            story.append(Paragraph(e(item["titulo"]), st["Heading3"]))
+            for f in item["fuentes"]:
+                story.append(Paragraph(f"• {e(f['nombre'])}: {_link(f['url'])}", st["Normal"]))
+            story.append(Spacer(1, 0.3 * cm))
+        return story
+    return _pdf(construir)
+
+
+# ---------- Mini brief ----------
+
+def _titulo_brief() -> str:
+    return f"{NOMBRE} · Mini brief · {datetime.now().strftime('%d/%m/%Y')}"
+
+
+def export_brief_word(texto: str) -> bytes:
+    doc = Document()
+    doc.add_heading(_titulo_brief(), level=0)
+    for linea in texto.splitlines():
+        marca, enlace = _MARCA.match(linea), _ENLACE.match(linea.strip())
+        if marca:
+            doc.add_heading(marca.group(1), level=2)
+        elif enlace:
+            doc.add_paragraph(f"{enlace.group(1)}: {enlace.group(2)}", style="List Bullet")
+        elif linea.strip():
+            doc.add_paragraph(linea.strip())
+    return _bytes(doc.save)
+
+
+def export_brief_pdf(texto: str) -> bytes:
+    def construir(st):
+        e = html.escape
+        story = [Paragraph(e(_titulo_brief()), st["Title"])]
+        anterior_marca = False
+        for linea in texto.splitlines():
+            marca, enlace = _MARCA.match(linea), _ENLACE.match(linea.strip())
+            if marca:
+                story.append(Paragraph(e(marca.group(1)), st["Heading2"]))
+            elif enlace:
+                story.append(Paragraph(f"• {e(enlace.group(1))}: {_link(enlace.group(2))}", st["Normal"]))
+            elif linea.strip():
+                # La línea que sigue a la marca de una noticia es su titular.
+                estilo = st["Heading4"] if anterior_marca else st["Normal"]
+                story.append(Paragraph(e(linea.strip()), estilo))
+                story.append(Spacer(1, 0.15 * cm))
+            anterior_marca = bool(marca)
         return story
     return _pdf(construir)

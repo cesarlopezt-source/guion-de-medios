@@ -1,5 +1,6 @@
 from urllib.parse import quote_plus, urlparse
 
+from config.paises import PAIS_KEYWORDS
 from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 
@@ -72,9 +73,44 @@ FUENTES = [
 ]
 
 
+# Estados Unidos: solo lo que afecta a El Salvador y la región. Entra cualquier medio (no solo los de FUENTES).
+BUSQUEDAS_EEUU = [
+    '"Estados Unidos" "El Salvador" aranceles OR remesas OR deportaciones OR deportados OR TPS',
+    '"Estados Unidos" "El Salvador" economía OR inversión OR acuerdo OR "Reserva Federal"',
+    'Trump "El Salvador"',
+    '"Estados Unidos" Centroamérica aranceles OR remesas OR migración OR economía',
+]
+
+# Organismos internacionales: lugares donde buscar noticias (no son un menú del portal).
+#   busqueda: consulta en Google News junto con "El Salvador".
+#   titular:  el titular debe nombrar al organismo (Google devuelve muchas notas que no lo mencionan).
+# El país de cada nota sale del texto, como en los medios regionales.
+ORGANISMOS = {
+    "FMI": {"busqueda": '"FMI" OR "Fondo Monetario Internacional"', "titular": ["fmi", "fondo monetario"]},
+    "BID": {"busqueda": '"BID" OR "Banco Interamericano de Desarrollo"',
+            "titular": ["bid", "banco interamericano de desarrollo", "grupo bid"]},
+    "Banco Mundial": {"busqueda": '"Banco Mundial"', "titular": ["banco mundial"]},
+    "ONU": {"busqueda": '"ONU" OR "Naciones Unidas"',
+            "titular": ["onu", "naciones unidas", "unicef", "pnud", "acnur", "oit", "oms", "ops", "cepal", "fao"]},
+}
+REGION_BUSQUEDA = ('"El Salvador" OR Centroamérica OR Guatemala OR Honduras OR Nicaragua OR "Costa Rica" '
+                   'OR Panamá OR "América Latina"')
+# Además del organismo, el titular debe tocar a Centroamérica o a América Latina.
+TITULAR_REGION = sorted({p for palabras in PAIS_KEYWORDS.values() for p in palabras} | {
+    "centroamérica", "centroamericano", "centroamericana", "centroamericanos", "américa latina",
+    "latinoamérica", "latinoamericano", "latinoamericana", "américa central", "triángulo norte"})
+# Estados Unidos: el titular debe nombrar a EE. UU. y también a El Salvador o a la región.
+TITULAR_EEUU = [
+    ["estados unidos", "ee.uu", "eeuu", "ee. uu", "estadounidense", "estadounidenses", "trump", "washington",
+     "casa blanca", "departamento de estado", "marco rubio", "rubio", "ice", "tps", "reserva federal"],
+    ["el salvador", "salvadoreño", "salvadoreña", "salvadoreños", "salvadoreñas", "bukele",
+     "centroamérica", "centroamericano", "centroamericana", "centroamericanos", "triángulo norte"],
+]
+
+
 def _url_google_news(consulta: str, pais: str) -> str:
     q = quote_plus(f"{consulta} when:1d")
-    gl = pais if pais != "REG" else "SV"
+    gl = pais if pais not in ("REG", "US") else "SV"
     return f"https://news.google.com/rss/search?q={q}&hl=es-419&gl={gl}&ceid={gl}:es-419"
 
 
@@ -101,6 +137,17 @@ def consultas_google_news() -> list:
         consultas.append({
             "nombre": f"Google News · Partido · {nombre}", "pais": "SV", "tipo": "google_news",
             "activa": True, "solo_medios_conocidos": True, "url": _url_google_news(p["busqueda"], "SV"),
+        })
+    for i, busqueda in enumerate(BUSQUEDAS_EEUU, 1):
+        consultas.append({
+            "nombre": f"Google News · Estados Unidos {i}", "pais": "US", "tipo": "google_news",
+            "activa": True, "titular": TITULAR_EEUU, "url": _url_google_news(busqueda, "US"),
+        })
+    for nombre, o in ORGANISMOS.items():
+        consultas.append({
+            "nombre": f"Google News · Organismo · {nombre}", "pais": "REG", "tipo": "google_news",
+            "activa": True, "titular": [o["titular"], TITULAR_REGION],
+            "url": _url_google_news(f'({o["busqueda"]}) ({REGION_BUSQUEDA})', "SV"),
         })
     return consultas
 

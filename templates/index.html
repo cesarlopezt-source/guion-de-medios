@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guion de Medios</title>
+    <title>MIXCOM News Monitor</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
 <header>
-    <h1>🎬 Guion de Medios <span>· Centroamérica</span></h1>
+    <h1>📡 MIXCOM News Monitor <span>· Centroamérica</span></h1>
     <div id="header-right">
         <span id="ultima">Cargando…</span>
         <a href="/fuentes">Estado de fuentes</a>
@@ -29,6 +29,7 @@
         </label>
         <span id="result-count"></span>
         <button onclick="seleccionarVisibles()">Seleccionar todo</button>
+        <button onclick="quitarSeleccion()">Quitar selección</button>
     </div>
 </div>
 
@@ -38,9 +39,14 @@
     <span id="selected-count">0 noticias seleccionadas</span>
     <button class="link-btn" onclick="abrirHistorial()">Guiones anteriores</button>
     <button id="btn-valorar" class="valorar-btn" onclick="valorarSeleccionadas()" disabled>Valorar ✦</button>
+    <select id="select-contenido" title="Qué va en el archivo">
+        <option value="completo">Informe completo</option>
+        <option value="links">Solo temas y links</option>
+    </select>
     <button class="export-btn" onclick="exportar('word')">Word</button>
     <button class="export-btn" onclick="exportar('excel')">Excel</button>
     <button class="export-btn" onclick="exportar('pdf')">PDF</button>
+    <button id="btn-brief" class="guion-btn" onclick="abrirBrief()" disabled>📝 Mini brief</button>
     <button id="btn-guion" class="guion-btn" onclick="generarGuion()" disabled>🎬 Generar Guion de medios</button>
 </div>
 
@@ -59,6 +65,31 @@
             <button onclick="descargarGuion('pdf')">Descargar PDF</button>
             <button class="secundario" onclick="generarGuion()">Regenerar</button>
             <button class="secundario" onclick="cerrarModal('modal-guion')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-brief" class="modal" hidden>
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2>Mini brief</h2>
+            <label>Contenido:
+                <select id="select-brief-modo">
+                    <option value="brief">Mini brief por noticia</option>
+                    <option value="analisis">Análisis general</option>
+                    <option value="ambos" selected>Ambos</option>
+                </select>
+            </label>
+            <button id="btn-brief-generar" onclick="generarBrief()">Generar</button>
+            <button class="cerrar" onclick="cerrarModal('modal-brief')" aria-label="Cerrar">×</button>
+        </div>
+        <textarea id="brief-texto"></textarea>
+        <div id="brief-estado"></div>
+        <div class="modal-acciones">
+            <button onclick="copiarBrief()">Copiar</button>
+            <button onclick="descargarBrief('word')">Descargar Word</button>
+            <button onclick="descargarBrief('pdf')">Descargar PDF</button>
+            <button class="secundario" onclick="cerrarModal('modal-brief')">Cerrar</button>
         </div>
     </div>
 </div>

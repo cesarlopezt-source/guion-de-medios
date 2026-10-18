@@ -62,3 +62,10 @@ def motor(request, tmp_path):
         return sqlite, tmp_path / "c.db"
     from store import postgres
     return postgres, request.getfixturevalue("pg_dsn")
+
+
+@pytest.fixture(autouse=True)
+def _sin_google(monkeypatch):
+    """Las pruebas nunca piden a Google el enlace real; las que lo necesitan reemplazan esta función."""
+    from collectors import google_enlaces
+    monkeypatch.setattr(google_enlaces, "enlace_real", lambda url, sesion=None: None)

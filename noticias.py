@@ -1,8 +1,12 @@
+import re
+
 from clusterer import agrupar
+from config.fuentes import TITULAR_EEUU
 from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 from config.temas import TEMAS
 from scorer import estrellas, puntuar
+from texto import normalizar
 
 _ORDEN_TEMAS = list(TEMAS)
 _ORDEN_PERSONAJES = list(PERSONAJES) + list(PARTIDOS)
@@ -19,7 +23,8 @@ def _noticia(cluster: list, puntaje: float) -> dict:
     for a in cluster:
         if a["fuente"] not in vistas:
             vistas.add(a["fuente"])
-            fuentes.append({"nombre": a["fuente"], "url": a["url"]})
+            # Si es de Google News y ya se conoce el enlace real del medio, se muestra ese.
+            fuentes.append({"nombre": a["fuente"], "url": a.get("enlace") or a["url"]})
     return {
         "titulo": max(cluster, key=lambda a: len(a["titulo"]))["titulo"],
         "resumen": max(cluster, key=lambda a: len(a.get("resumen") or ""))["resumen"] or "",
@@ -50,15 +55,42 @@ def construir_noticias(articulos: list) -> list:
     return resultado
 
 
-def filtrar(noticias: list, paises: set, temas: set, personajes: set, partidos: set = frozenset()) -> list:
+AMBITOS = ["Nacionales", "Internacionales"]
+_EEUU = [re.compile(rf"\b(?:{'|'.join(re.escape(normalizar(p)) for p in grupo)})\b") for grupo in TITULAR_EEUU]
+
+
+def trata_de_eeuu(noticia: dict) -> bool:
+    """El titular nombra a EE. UU. y también a El Salvador o la región (aranceles, TPS, deportaciones…)."""
+    titulo = normalizar(noticia["titulo"])
+    return all(p.search(titulo) for p in _EEUU)
+
+
+def _pais_marcado(noticia: dict, paises: set) -> bool:
+    # "Estados Unidos" reúne las notas de su relación con la región, sea cual sea el medio que las publicó.
+    return noticia["pais"] in paises or ("US" in paises and trata_de_eeuu(noticia))
+
+
+def ambitos_de(noticia: dict) -> set:
+    """Nacionales = de El Salvador o que lo mencionan; Internacionales = de cualquier otro país."""
+    resultado = set()
+    if noticia["pais"] == "SV" or noticia.get("menciona_sv"):
+        resultado.add("Nacionales")
+    if noticia["pais"] != "SV":
+        resultado.add("Internacionales")
+    return resultado
+
+
+def filtrar(noticias: list, paises: set, temas: set, personajes: set, partidos: set = frozenset(),
+            ambitos: set = frozenset()) -> list:
     """País marcado Y algún tema marcado Y (si hay personajes marcados) algún personaje marcado
-    Y (si hay partidos marcados) algún partido marcado."""
+    Y (si hay partidos marcados) algún partido marcado Y (si hay ámbitos marcados) algún ámbito marcado."""
     return [
         n for n in noticias
-        if n["pais"] in paises
+        if _pais_marcado(n, paises)
         and temas.intersection(n["temas"])
         and (not personajes or personajes.intersection(n["personajes"]))
         and (not partidos or partidos.intersection(n["personajes"]))
+        and (not ambitos or ambitos.intersection(ambitos_de(n)))
     ]
 
 

@@ -90,3 +90,20 @@ def test_filtro_partidos_aparte_de_personajes():
     assert len(filtrar(ns, {"SV"}, {"Política"}, set(), {"Nuevas Ideas", "ARENA"})) == 2
     assert len(filtrar(ns, {"SV"}, {"Política"}, {"Nayib Bukele"}, {"Nuevas Ideas"})) == 1
     assert len(filtrar(ns, {"SV"}, {"Política"}, set(), set())) == 3
+
+
+def test_filtro_ambito():
+    sv, gt, gt_sv = nt("SV", ["Economía"], []), nt("GT", ["Economía"], []), nt("GT", ["Economía"], [])
+    gt_sv["menciona_sv"] = True
+    ns = [sv, gt, gt_sv]
+    todos = {"SV", "GT"}
+    assert filtrar(ns, todos, {"Economía"}, set(), set(), {"Nacionales"}) == [sv, gt_sv]
+    assert filtrar(ns, todos, {"Economía"}, set(), set(), {"Internacionales"}) == [gt, gt_sv]
+    assert len(filtrar(ns, todos, {"Economía"}, set(), set(), set())) == 3
+
+
+def test_estados_unidos_incluye_notas_de_su_relacion_con_la_region():
+    tps = {**nt("SV", ["Economía"], []), "titulo": "Incertidumbre del TPS frena trámites de salvadoreños"}
+    solo_sv = {**nt("SV", ["Economía"], []), "titulo": "Remesas crecen en El Salvador"}
+    assert filtrar([tps, solo_sv], {"US"}, {"Economía"}, set()) == [tps]
+    assert len(filtrar([tps, solo_sv], {"SV"}, {"Economía"}, set())) == 2

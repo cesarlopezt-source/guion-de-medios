@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS articulos (
     via TEXT NOT NULL,
     origen TEXT NOT NULL DEFAULT 'pc'
 );
+ALTER TABLE articulos ADD COLUMN IF NOT EXISTS enlace TEXT;
 CREATE INDEX IF NOT EXISTS idx_articulos_publicado ON articulos(publicado);
 CREATE INDEX IF NOT EXISTS idx_articulos_recolectado ON articulos(recolectado);
 CREATE TABLE IF NOT EXISTS noticias (
@@ -127,7 +128,8 @@ def guardar_articulos(articulos: list, db_path=None, origen: str = "pc") -> int:
     filas = [
         (a["titulo"], a.get("resumen", ""), a["url"], a["fuente"], a["pais"], Jsonb(a.get("temas", [])),
          Jsonb(a.get("personajes", [])), bool(a.get("menciona_sv")), _ts(a["publicado"]),
-         _ts(a["recolectado"]) if a.get("recolectado") else recolectado, a["via"], a.get("origen") or origen)
+         _ts(a["recolectado"]) if a.get("recolectado") else recolectado, a["via"], a.get("origen") or origen,
+         a.get("enlace"))
         for a in articulos
     ]
     with _conectar(db_path) as conn:
@@ -136,15 +138,15 @@ def guardar_articulos(articulos: list, db_path=None, origen: str = "pc") -> int:
         with conn.cursor() as cur:
             with cur.copy(
                 "COPY tmp_articulos (titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, "
-                "publicado, recolectado, via, origen) FROM STDIN"
+                "publicado, recolectado, via, origen, enlace) FROM STDIN"
             ) as copia:
                 for fila in filas:
                     copia.write_row(fila)
             cur.execute(
                 "INSERT INTO articulos (titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, "
-                "publicado, recolectado, via, origen) "
+                "publicado, recolectado, via, origen, enlace) "
                 "SELECT DISTINCT ON (url) titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, "
-                "publicado, recolectado, via, origen FROM tmp_articulos "
+                "publicado, recolectado, via, origen, enlace FROM tmp_articulos "
                 "ON CONFLICT (url) DO NOTHING"
             )
             return cur.rowcount
@@ -157,7 +159,7 @@ def _articulo(f: dict) -> dict:
     return a
 
 
-_COLS_ARTICULO = "titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via"
+_COLS_ARTICULO = "titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via, enlace"
 
 
 def obtener_articulos(mes: int, anio: int, db_path=None) -> list:
@@ -183,6 +185,34 @@ def articulos_desde(marca, db_path=None, origen: str = None) -> list:
             f"SELECT {_COLS_ARTICULO}, recolectado, origen FROM articulos {where} ORDER BY recolectado, id", params
         ).fetchall()
     return [_articulo(f) for f in filas]
+
+
+def urls_existentes(urls: list, db_path=None) -> set:
+    """De `urls`, las que ya están guardadas."""
+    if not urls:
+        return set()
+    with _conectar(db_path) as conn:
+        filas = conn.execute("SELECT url FROM articulos WHERE url = ANY(%s)", (list(set(urls)),)).fetchall()
+    return {f["url"] for f in filas}
+
+
+def urls_sin_enlace(limite: int, db_path=None) -> list:
+    """Enlaces de Google News guardados a los que todavía no se les buscó el enlace real (los más nuevos primero)."""
+    with _conectar(db_path) as conn:
+        filas = conn.execute(
+            "SELECT url FROM articulos WHERE enlace IS NULL AND url LIKE 'https://news.google.com/%%' "
+            "ORDER BY publicado DESC LIMIT %s", (limite,),
+        ).fetchall()
+    return [f["url"] for f in filas]
+
+
+def poner_enlaces(enlaces: dict, db_path=None) -> None:
+    """url de Google → enlace real ('' = no se pudo obtener; no se vuelve a intentar)."""
+    if not enlaces:
+        return
+    with _conectar(db_path) as conn:
+        with conn.cursor() as cur:
+            cur.executemany("UPDATE articulos SET enlace = %s WHERE url = %s", [(e, u) for u, e in enlaces.items()])
 
 
 def podar_articulos(antes_de: str, db_path=None) -> int:

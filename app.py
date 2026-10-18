@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, Response, jsonify, redirect, render_template, request, session
 
 import ajustes
+import brief
 import exporter
 import guionista
 import store
@@ -20,7 +21,7 @@ from config.partidos import PARTIDOS
 from config.personajes import PERSONAJES
 from config.temas import TEMAS
 from ia import ConfigError, IASaturada
-from noticias import filtrar, ordenar
+from noticias import AMBITOS, filtrar, ordenar
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
@@ -180,6 +181,7 @@ def api_meta():
         "temas": TEMAS_UI,
         "personajes": list(PERSONAJES),
         "partidos": list(PARTIDOS),
+        "ambitos": AMBITOS,
         "ultima_actualizacion": ultima["fin"] if ultima else None,
         "meses": [list(m) for m in store.meses_disponibles()],
         "en_curso": origen_en_curso is not None,
@@ -203,7 +205,8 @@ def api_news():
     if not 1 <= mes <= 12:
         return jsonify({"error": "Mes inválido"}), 400
 
-    noticias = filtrar(store.obtener_noticias(mes, anio), _csv("paises"), _csv("temas"), _csv("personajes"), _csv("partidos"))
+    noticias = filtrar(store.obtener_noticias(mes, anio), _csv("paises"), _csv("temas"), _csv("personajes"),
+                       _csv("partidos"), _csv("ambitos"))
     noticias = ordenar(noticias, request.args.get("orden", "importancia"))
 
     if (mes, anio) != (ahora.month, ahora.year):
@@ -242,6 +245,10 @@ def api_export():
     data = request.get_json(silent=True) or {}
     formato = data.get("format", "pdf").lower()
     formato = formato if formato in MIME else "pdf"
+    if data.get("modo") == "links":  # solo el titular de cada noticia y sus links
+        funcion = {"word": exporter.export_links_word, "excel": exporter.export_links_excel,
+                   "pdf": exporter.export_links_pdf}[formato]
+        return _archivo(funcion(data.get("items", [])), formato, "temas_y_links")
     funcion = {"word": exporter.export_word, "excel": exporter.export_excel, "pdf": exporter.export_pdf}[formato]
     return _archivo(funcion(data.get("items", [])), formato, "noticias_centroamerica")
 
@@ -277,3 +284,18 @@ def api_guion_export():
     if data.get("formato") == "word":
         return _archivo(exporter.export_guion_word(texto), "word", "guion_de_medios")
     return _archivo(exporter.export_guion_pdf(texto), "pdf", "guion_de_medios")
+
+
+@app.route("/api/brief", methods=["POST"])
+def api_brief():
+    data = request.get_json(silent=True) or {}
+    return _manejar_ia(lambda: jsonify(brief.generar_brief(data.get("noticias", []), data.get("modo", "ambos"))))
+
+
+@app.route("/api/brief/export", methods=["POST"])
+def api_brief_export():
+    data = request.get_json(silent=True) or {}
+    texto = data.get("texto", "")
+    if data.get("formato") == "word":
+        return _archivo(exporter.export_brief_word(texto), "word", "mini_brief")
+    return _archivo(exporter.export_brief_pdf(texto), "pdf", "mini_brief")

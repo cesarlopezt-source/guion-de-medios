@@ -12,6 +12,7 @@ else:
 
 _PUBLICAS = [
     "init_db", "guardar_articulos", "obtener_articulos", "articulos_desde", "podar_articulos",
+    "urls_existentes", "urls_sin_enlace", "poner_enlaces",
     "reemplazar_noticias", "obtener_noticias", "meses_disponibles",
     "registrar_estado_fuente", "obtener_estado_fuentes",
     "iniciar_corrida", "intentar_iniciar_corrida", "corrida_en_curso", "finalizar_corrida", "ultima_corrida", "ultimo_intento",

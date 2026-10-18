@@ -5,6 +5,7 @@ PAISES = {
     "NI": "Nicaragua",
     "CR": "Costa Rica",
     "PA": "Panamá",
+    "US": "Estados Unidos",  # solo noticias de su relación con El Salvador y la región (config/fuentes.py)
     "REG": "Regional",
 }
 

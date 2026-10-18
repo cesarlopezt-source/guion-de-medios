@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS articulos (
     publicado TEXT NOT NULL,
     recolectado TEXT NOT NULL,
     via TEXT NOT NULL,
-    origen TEXT NOT NULL DEFAULT 'pc'
+    origen TEXT NOT NULL DEFAULT 'pc',
+    enlace TEXT                -- enlace real del medio cuando url es de Google News ('' = no se pudo)
 );
 CREATE TABLE IF NOT EXISTS noticias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,6 +89,7 @@ _COLUMNAS_NUEVAS = [
     ("articulos", "origen", "TEXT NOT NULL DEFAULT 'pc'"),
     ("corridas", "origen", "TEXT NOT NULL DEFAULT 'pc'"),
     ("guiones", "uid", "TEXT"),
+    ("articulos", "enlace", "TEXT"),
 ]
 
 
@@ -136,14 +138,14 @@ def guardar_articulos(articulos: list, db_path: Path = None, origen: str = "pc")
     for a in articulos:
         cur = conn.execute(
             "INSERT OR IGNORE INTO articulos (titulo, resumen, url, fuente, pais, temas, personajes, "
-            "menciona_sv, publicado, recolectado, via, origen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "menciona_sv, publicado, recolectado, via, origen, enlace) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 a["titulo"], a.get("resumen", ""), a["url"], a["fuente"], a["pais"],
                 json.dumps(a.get("temas", []), ensure_ascii=False),
                 json.dumps(a.get("personajes", []), ensure_ascii=False),
                 int(bool(a.get("menciona_sv"))),
                 _iso(a["publicado"]), _iso(a["recolectado"]) if a.get("recolectado") else recolectado,
-                a["via"], a.get("origen") or origen,
+                a["via"], a.get("origen") or origen, a.get("enlace"),
             ),
         )
         nuevos += cur.rowcount
@@ -173,11 +175,43 @@ def articulos_desde(marca, db_path: Path = None, origen: str = None) -> list:
     where = f"WHERE {' AND '.join(condiciones)}" if condiciones else ""
     conn = _conectar(db_path)
     filas = conn.execute(
-        "SELECT titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via, "
+        "SELECT titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via, enlace, "
         f"recolectado, origen FROM articulos {where} ORDER BY recolectado, id", params,
     ).fetchall()
     conn.close()
     return [_articulo(f) for f in filas]
+
+
+def urls_existentes(urls: list, db_path: Path = None) -> set:
+    """De `urls`, las que ya están guardadas."""
+    unicas = list(set(urls))
+    conn = _conectar(db_path)
+    resultado = set()
+    for i in range(0, len(unicas), 500):
+        lote = unicas[i:i + 500]
+        filas = conn.execute(f"SELECT url FROM articulos WHERE url IN ({','.join('?' * len(lote))})", lote)
+        resultado.update(f["url"] for f in filas)
+    conn.close()
+    return resultado
+
+
+def urls_sin_enlace(limite: int, db_path: Path = None) -> list:
+    """Enlaces de Google News guardados a los que todavía no se les buscó el enlace real (los más nuevos primero)."""
+    conn = _conectar(db_path)
+    filas = conn.execute(
+        "SELECT url FROM articulos WHERE enlace IS NULL AND url LIKE 'https://news.google.com/%' "
+        "ORDER BY publicado DESC LIMIT ?", (limite,),
+    ).fetchall()
+    conn.close()
+    return [f["url"] for f in filas]
+
+
+def poner_enlaces(enlaces: dict, db_path: Path = None) -> None:
+    """url de Google → enlace real ('' = no se pudo obtener; no se vuelve a intentar)."""
+    conn = _conectar(db_path)
+    with conn:
+        conn.executemany("UPDATE articulos SET enlace = ? WHERE url = ?", [(e, u) for u, e in enlaces.items()])
+    conn.close()
 
 
 def podar_articulos(antes_de: str, db_path: Path = None) -> int:
@@ -191,7 +225,7 @@ def podar_articulos(antes_de: str, db_path: Path = None) -> int:
 def obtener_articulos(mes: int, anio: int, db_path: Path = None) -> list:
     conn = _conectar(db_path)
     filas = conn.execute(
-        "SELECT titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via "
+        "SELECT titulo, resumen, url, fuente, pais, temas, personajes, menciona_sv, publicado, via, enlace "
         "FROM articulos WHERE strftime('%Y-%m', publicado, '-6 hours') = ?",  # mes en hora de El Salvador
         (f"{anio:04d}-{mes:02d}",),
     ).fetchall()

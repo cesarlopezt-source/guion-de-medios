@@ -213,3 +213,16 @@ def test_postgres_conserva_options_de_la_direccion(monkeypatch):
     monkeypatch.setattr(postgres.psycopg, "connect", lambda dsn, **kw: vistos.update(kw) or None)
     postgres._conectar("postgresql://x/db?options=-csearch_path%3Dt_abc")
     assert "search_path=t_abc" in vistos["options"] and "statement_timeout" in vistos["options"]
+
+
+def test_enlaces_reales(m):
+    s, d = m
+    g1, g2 = "https://news.google.com/rss/articles/a", "https://news.google.com/rss/articles/b"
+    s.guardar_articulos([art(g1, dia=6), art(g2, dia=5), art("https://medio.com/x", enlace=None)], d)
+    assert s.urls_existentes([g1, "https://nuevo.com"], d) == {g1}
+    assert s.urls_sin_enlace(10, d) == [g1, g2]  # los más nuevos primero; solo los de Google
+    s.poner_enlaces({g1: "https://medio.com/1", g2: ""}, d)
+    assert s.urls_sin_enlace(10, d) == []
+    enlaces = {a["url"]: a["enlace"] for a in s.obtener_articulos(10, 2026, d)}
+    assert enlaces[g1] == "https://medio.com/1" and enlaces[g2] == ""
+    assert {a["url"]: a["enlace"] for a in s.articulos_desde(None, d)}[g1] == "https://medio.com/1"

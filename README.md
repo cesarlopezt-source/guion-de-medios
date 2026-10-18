@@ -1,4 +1,4 @@
-# Guion de Medios · Centroamérica
+# MIXCOM News Monitor · Centroamérica
 
 Portal local que reúne cada hora las noticias de medios centroamericanos (foco El Salvador), permite filtrarlas por país, tema y personaje, y genera con Gemini un **Guion de medios**: un guion de noticiero de 3 a 5 minutos para grabar en video.
 
@@ -9,6 +9,10 @@ Abrir: acceso directo **Guion de Medios** en el escritorio, o <http://127.0.0.1:
 - **Watcher** (`watcher.py`): la tarea programada `GuionMedios-Watcher` lo corre cada hora. Lee los RSS de los medios, la lectura web de los que no tienen RSS y Google News (una búsqueda por medio y una por personaje). Clasifica, agrupa noticias parecidas, calcula el puntaje y lo guarda todo en la base local.
 - **Portal** (`serve.py`): la tarea `GuionMedios-Portal` lo inicia 2 minutos después de iniciar sesión en Windows. Solo lee la base, así que los filtros responden al instante.
 - **Estado de fuentes**: enlace en el encabezado del portal; muestra qué medio respondió en la última corrida.
+- **Enlaces reales**: Google News entrega un enlace intermedio que no abre desde un PDF (error 405). La PC lo cambia por el enlace del medio (`collectors/google_enlaces.py`): los nuevos en cada corrida y 300 atrasados por corrida. Google corta con 429 si se le pide rápido; entonces se pausa 30 min y se reintenta. Para convertir de una vez los ya guardados: `python scripts/convertir_enlaces.py`.
+- **Estados Unidos y organismos (FMI, BID, Banco Mundial, ONU)**: búsquedas en Google News en `config/fuentes.py` (`BUSQUEDAS_EEUU`, `ORGANISMOS`). Solo entran notas cuyo titular nombra a EE. UU. junto con El Salvador o la región, o al organismo junto con un país centroamericano o América Latina.
+- **Mini brief**: botón aparte del guion. Por noticia (qué pasó y por qué importa), análisis general o ambos; se descarga en PDF o Word con los links.
+- **Exportar**: "Informe completo" o "Solo temas y links" (titular y links de cada noticia) en Word, Excel o PDF.
 
 ## Dónde está cada cosa
 

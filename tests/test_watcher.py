@@ -239,3 +239,47 @@ def test_sincronizacion_por_defecto_solo_con_database_url(monkeypatch):
     assert type(watcher._sincronizacion_por_defecto()).__name__ == "Sincronizacion"
     monkeypatch.setattr(ajustes, "MODO", "nube")
     assert watcher._sincronizacion_por_defecto() is None
+
+
+def test_enlace_real_de_google_news(monkeypatch, rutas):
+    from collectors import google_enlaces
+    g1, g2 = "https://news.google.com/rss/articles/g1", "https://news.google.com/rss/articles/g2"
+    monkeypatch.setattr(google_enlaces, "enlace_real", lambda u, sesion=None: {g1: "https://medio.com/1"}.get(u, ""))
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art(g1, via="google_news"),
+                                                            art(g2, "Otra noticia de economía", "google_news")], None))
+    watcher.correr([F2], ahora=AHORA, **rutas)
+    urls = {f["url"] for n in store.obtener_noticias(10, 2026, rutas["db_path"]) for f in n["fuentes"]}
+    assert urls == {"https://medio.com/1", g2}  # sin enlace real se queda el de Google
+    assert store.urls_sin_enlace(10, rutas["db_path"]) == []  # el fallido quedó marcado: no se reintenta
+
+
+def test_enlaces_atrasados_se_completan(monkeypatch, rutas):
+    from collectors import google_enlaces
+    g1 = "https://news.google.com/rss/articles/g1"
+    store.init_db(rutas["db_path"])
+    store.guardar_articulos([{**art(g1, via="google_news"), "temas": [], "personajes": []}], rutas["db_path"])
+    assert store.urls_sin_enlace(10, rutas["db_path"]) == [g1]
+    monkeypatch.setattr(google_enlaces, "enlace_real", lambda u, sesion=None: "https://medio.com/1")
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art("u1")], None))
+    watcher.correr([F1], ahora=AHORA, **rutas)
+    urls = {f["url"] for n in store.obtener_noticias(10, 2026, rutas["db_path"]) for f in n["fuentes"]}
+    assert "https://medio.com/1" in urls
+
+
+def test_enlace_fallido_por_ahora_se_reintenta(monkeypatch, rutas):
+    from collectors import google_enlaces
+    g1 = "https://news.google.com/rss/articles/g1"
+    monkeypatch.setattr(google_enlaces, "enlace_real", lambda u, sesion=None: None)  # p. ej. Google en pausa
+    monkeypatch.setattr(watcher, "recolectar", lambda f: ([art(g1, via="google_news")], None))
+    watcher.correr([F2], ahora=AHORA, **rutas)
+    assert store.urls_sin_enlace(10, rutas["db_path"]) == [g1]
+
+
+def test_nube_no_busca_enlaces_reales(monkeypatch, rutas):
+    from collectors import google_enlaces
+    llamadas = []
+    monkeypatch.setattr(google_enlaces, "enlace_real", lambda u, sesion=None: llamadas.append(u) or "https://m/1")
+    monkeypatch.setattr(watcher, "recolectar",
+                        lambda f: ([art("https://news.google.com/rss/articles/g1", via="google_news")], None))
+    watcher.correr([F2], ahora=AHORA, origen="nube", verificar_enlaces=False, **rutas)
+    assert llamadas == []
