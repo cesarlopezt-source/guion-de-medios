@@ -23,8 +23,8 @@ _API = "https://news.google.com/_/DotsSplashUi/data/batchexecute"
 _FIRMA = re.compile(r'data-n-a-sg="([^"]+)"')
 _FECHA = re.compile(r'data-n-a-ts="([^"]+)"')
 
-INTERVALO_S = 1.0        # mínimo entre dos pedidos a Google
-PAUSA_429_S = 30 * 60    # tras un 429 no se le pide nada a Google por este tiempo
+INTERVALO_S = 3.0        # mínimo entre dos pedidos a Google
+PAUSA_429_S = 3 * 3600   # tras un bloqueo (429 o página "sorry") no se le pide nada a Google por este tiempo
 _candado = threading.Lock()
 _ultimo = 0.0
 _pausa_hasta = 0.0
@@ -58,7 +58,7 @@ def _pedir(metodo, url, **kw):
             time.sleep(espera)
         _ultimo = time.monotonic()
     resp = metodo(url, timeout=TIMEOUT, **kw)
-    if getattr(resp, "status_code", 200) == 429:
+    if getattr(resp, "status_code", 200) == 429 or "google.com/sorry" in str(getattr(resp, "url", "")):
         _pausa_hasta = time.monotonic() + PAUSA_429_S
         raise _Limitado()
     return resp

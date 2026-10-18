@@ -22,8 +22,8 @@ MAX_PARALELO = 8
 ENLACES_POR_CORRIDA = 300  # verificación de noticias archivadas, por tandas
 PRIORIDAD_VIA = {"rss": 0, "web": 1, "google_news": 2}
 # Enlaces de Google News → enlace real del medio (2 consultas a Google por enlace).
-ENLACES_NUEVOS_POR_CORRIDA = 600
-ENLACES_ATRASADOS_POR_CORRIDA = 300
+ENLACES_NUEVOS_POR_CORRIDA = 200
+ENLACES_ATRASADOS_POR_CORRIDA = 100
 
 
 def _edad_min(lock_path: Path) -> float:
