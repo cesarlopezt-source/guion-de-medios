@@ -143,7 +143,7 @@ header h1 span { font-weight: 400; opacity: 0.75; }
 .guion-btn:hover:not(:disabled) { background: #A93226; }
 button:disabled { opacity: 0.5; cursor: default; }
 
-/* Ventana del guion */
+/* Ventanas del guion y del mini brief */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .modal[hidden] { display: none; }
 .modal-box {
@@ -154,14 +154,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .modal-head h2 { font-size: 1.1rem; flex: 1; }
 #guion-tiempo { color: var(--gris); font-size: 0.88rem; }
 .cerrar { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--gris); }
-#guion-texto {
+#guion-texto, #brief-texto {
     flex: 1; min-height: 50vh; margin: 1rem 1.3rem; padding: 0.8rem; border: 1px solid var(--borde); border-radius: 6px;
     font-family: inherit; font-size: 0.95rem; line-height: 1.6; resize: vertical;
 }
 .modal-acciones { display: flex; gap: 0.6rem; flex-wrap: wrap; padding: 0 1.3rem 1.1rem; }
 .modal-acciones button { padding: 0.45rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; color: white; background: var(--azul); }
 .modal-acciones .secundario { background: #95A5A6; }
-#guion-estado { padding: 0 1.3rem 0.8rem; font-size: 0.85rem; color: var(--gris); }
+#guion-estado, #brief-estado { padding: 0 1.3rem 0.8rem; font-size: 0.85rem; color: var(--gris); }
 #lista-guiones { list-style: none; padding: 0.6rem 1.3rem 1.2rem; overflow-y: auto; }
 #lista-guiones li { padding: 0.7rem 0.8rem; border-bottom: 1px solid #ECF0F1; cursor: pointer; font-size: 0.88rem; }
 #lista-guiones li:hover { background: var(--fondo); }
